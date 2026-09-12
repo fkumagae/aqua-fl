@@ -25,6 +25,7 @@ edgebox.db
 # Dados brutos e processados de benchmark
 dados/edgebox/raw/
 dados/edgebox/processed/
+dados/edgebox/models/
 
 # Histórico grande / runtime
 dados/edgebox/edgebox_metrics.jsonl
