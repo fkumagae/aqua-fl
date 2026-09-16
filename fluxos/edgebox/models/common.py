@@ -267,6 +267,8 @@ def train_model(
     epochs: int,
     learning_rate: float,
     device: torch.device,
+    verbose: bool = False,
+    quiet: bool = False,
 ) -> tuple[list[dict[str, float]], float]:
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -277,7 +279,7 @@ def train_model(
         model.train()
         loss_sum = 0.0
         sample_count = 0
-        for inputs, targets in loaders["train"]:
+        for batch_index, (inputs, targets) in enumerate(loaders["train"], start=1):
             inputs = inputs.to(device=device, dtype=torch.float32)
             targets = targets.to(device=device, dtype=torch.float32)
             optimizer.zero_grad(set_to_none=True)
@@ -287,6 +289,12 @@ def train_model(
             optimizer.step()
             loss_sum += loss.item() * inputs.shape[0]
             sample_count += inputs.shape[0]
+            if verbose:
+                print(
+                    f"epoch={epoch}/{epochs} batch={batch_index}/{len(loaders['train'])} "
+                    f"batch_mse={loss.item():.6f}",
+                    flush=True,
+                )
 
         validation = calculate_metrics(model, loaders["validation"], device)
         epoch_metrics = {
@@ -295,11 +303,12 @@ def train_model(
             "validation_mse": validation["mse"],
         }
         history.append(epoch_metrics)
-        print(
-            f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f} "
-            f"validation_mse={epoch_metrics['validation_mse']:.6f}",
-            flush=True,
-        )
+        if not quiet:
+            print(
+                f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f} "
+                f"validation_mse={epoch_metrics['validation_mse']:.6f}",
+                flush=True,
+            )
 
     return history, time.perf_counter() - started
 
@@ -323,6 +332,8 @@ def run_experiment(
     seed: int,
     dataset_dir: Path | None = None,
     output_dir: Path | None = None,
+    verbose: bool = False,
+    quiet: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Train, evaluate and serialize one forecasting model."""
 
@@ -338,6 +349,8 @@ def run_experiment(
         epochs=epochs,
         learning_rate=learning_rate,
         device=device,
+        verbose=verbose,
+        quiet=quiet,
     )
 
     train_metrics = calculate_metrics(model, loaders["train"], device)
@@ -359,6 +372,7 @@ def run_experiment(
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "seed": seed,
+        "logging": "verbose" if verbose else "quiet" if quiet else "per_epoch",
         "optimizer": "Adam",
         "loss": "MSELoss",
         "parameter_count": parameter_count,
@@ -423,6 +437,17 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=_positive_int, default=32)
     parser.add_argument("--learning-rate", type=_positive_float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
+    logging = parser.add_mutually_exclusive_group()
+    logging.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Mostra a perda de cada batch alem do resumo por epoca.",
+    )
+    logging.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suprime o progresso por epoca; util para benchmarks automatizados.",
+    )
     return parser.parse_args()
 
 
@@ -443,4 +468,6 @@ def run_model_cli(
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         seed=args.seed,
+        verbose=args.verbose,
+        quiet=args.quiet,
     )

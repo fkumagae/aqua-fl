@@ -15,6 +15,9 @@ The optional `--seed` argument defaults to `42`. Outputs are written to
 `dados/edgebox/models/<model>/w60_h60/` as `model.pt`, `model.json`, and
 `metrics.json`. The weights file contains only the model `state_dict`.
 
+Progress is shown once per epoch by default. Use `--verbose` to also show every
+batch or `--quiet` when an automated benchmark should minimize terminal I/O.
+
 `requirements-benchmark.txt` is platform-neutral. On the Linux ARM64 TV Box,
 install the CPU wheel explicitly before installing the remaining requirements:
 

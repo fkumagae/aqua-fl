@@ -969,52 +969,6 @@ function unwrapValue(value){
 }
 
 
-function unwrapValue(value){
-
-  if(Array.isArray(value)){
-
-    for(let i=value.length-1;i>=0;i--){
-
-      const result=unwrapValue(value[i]);
-
-      if(
-        result!==undefined &&
-        result!==null &&
-        result!==""
-      ){
-        return result;
-      }
-
-    }
-
-    return undefined;
-  }
-
-  if(value && typeof value==="object"){
-
-    const preferred=[
-      "value",
-      "current",
-      "latest",
-      "last",
-      "actual",
-      "y"
-    ];
-
-    for(const key of preferred){
-
-      if(value[key]!==undefined){
-        return unwrapValue(value[key]);
-      }
-
-    }
-
-  }
-
-  return value;
-}
-
-
 function recursiveFind(obj,names){
 
   if(obj===null || obj===undefined){

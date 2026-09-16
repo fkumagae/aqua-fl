@@ -33,6 +33,7 @@ dados/edgebox/edgebox_metrics.jsonl
 # Arquivos gerados em runtime
 web/edgebox_history.json
 web/edgebox_live.json
+web/legacy.html
 edgebox_history.json
 
 # Temporários
