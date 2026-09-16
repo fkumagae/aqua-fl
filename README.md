@@ -61,7 +61,7 @@ Os testes reais foram executados em uma TV Box com:
 | Aceleração | CPU only; CUDA não é usada |
 | Amostragem operacional | aproximadamente 10 segundos |
 
-O coletor usa interfaces nativas do Linux como `/proc`, `/sys`, `ping` e contadores de rede. O pipeline de forecasting também funciona no Windows para desenvolvimento e testes.
+O ambiente-alvo é a TV Box ARM64 com Linux. O coletor usa interfaces nativas do sistema como `/proc`, `/sys`, `ping` e contadores de rede.
 
 ## Métricas operacionais
 
@@ -177,8 +177,6 @@ python -m pip install --upgrade pip
 pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements-benchmark.txt
 ```
-
-No Windows, ative o ambiente com `.venv-benchmark\Scripts\activate` e instale a wheel apropriada do PyTorch.
 
 ## Execução rápida
 
