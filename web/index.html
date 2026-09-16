@@ -1104,10 +1104,12 @@ function updateHealth(data){
   const rawRisk=recursiveFind(
     data,
     [
+      "inferred_risk",
       "operational_risk",
       "risk_operational",
       "risk",
       "risk_score",
+      "target_risk",
       "risco_operacional",
       "risco"
     ]
@@ -1167,15 +1169,15 @@ function updateHealth(data){
     health.toFixed(0);
 
 
-  if(health>=80){
+  if(riskPercent<35){
 
     state.textContent=
-      "SISTEMA SAUDÁVEL";
+      "SISTEMA ESTÁVEL";
 
     state.style.color=
       "#4ce6ad";
 
-  }else if(health>=60){
+  }else if(riskPercent<55){
 
     state.textContent=
       "ATENÇÃO OPERACIONAL";
@@ -1183,10 +1185,18 @@ function updateHealth(data){
     state.style.color=
       "#f2c45d";
 
+  }else if(riskPercent<75){
+
+    state.textContent=
+      "ALERTA OPERACIONAL";
+
+    state.style.color=
+      "#ff9a66";
+
   }else{
 
     state.textContent=
-      "RISCO ELEVADO";
+      "ESTADO CRÍTICO";
 
     state.style.color=
       "#ff6677";
