@@ -18,9 +18,8 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 
-DATASET_NAME = "forecast_w60_h60"
 INPUT_WINDOW = 60
-FORECAST_HORIZON = 60
+DEFAULT_FORECAST_HORIZON = 60
 INPUT_SIZE = 6
 OUTPUT_SIZE = 6
 FEATURES = [
@@ -56,12 +55,16 @@ def project_root() -> Path:
     raise RuntimeError(f"Could not resolve the AquaFL project root from {source}")
 
 
-def default_dataset_dir() -> Path:
-    return project_root() / "dados" / "edgebox" / "processed" / DATASET_NAME
+def dataset_name(horizon: int) -> str:
+    return f"forecast_w{INPUT_WINDOW}_h{horizon}"
 
 
-def default_output_dir(model_type: str) -> Path:
-    return project_root() / "dados" / "edgebox" / "models" / model_type / "w60_h60"
+def default_dataset_dir(horizon: int = DEFAULT_FORECAST_HORIZON) -> Path:
+    return project_root() / "dados" / "edgebox" / "processed" / dataset_name(horizon)
+
+
+def default_output_dir(model_type: str, horizon: int = DEFAULT_FORECAST_HORIZON) -> Path:
+    return project_root() / "dados" / "edgebox" / "models" / model_type / f"w{INPUT_WINDOW}_h{horizon}"
 
 
 def set_seed(seed: int) -> None:
@@ -131,10 +134,10 @@ def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None
         raise ValueError(f"{split}.npz contains no samples")
 
 
-def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle) -> None:
+def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle, horizon: int) -> None:
     expected = {
         "input_window": INPUT_WINDOW,
-        "forecast_horizon": FORECAST_HORIZON,
+        "forecast_horizon": horizon,
         "forecast_type": "point",
         "features": FEATURES,
         "dtype": "float32",
@@ -158,10 +161,15 @@ def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle) -> None:
             )
 
 
-def load_dataset(dataset_dir: Path | None = None) -> DatasetBundle:
+def load_dataset(
+    dataset_dir: Path | None = None,
+    horizon: int = DEFAULT_FORECAST_HORIZON,
+) -> DatasetBundle:
     """Load and validate all splits exactly once."""
 
-    resolved = (dataset_dir or default_dataset_dir()).resolve()
+    if horizon <= 0:
+        raise ValueError("forecast horizon must be greater than zero")
+    resolved = (dataset_dir or default_dataset_dir(horizon)).resolve()
     metadata = _read_metadata(resolved)
     train_x, train_y = _load_split(resolved, "train")
     validation_x, validation_y = _load_split(resolved, "validation")
@@ -175,7 +183,7 @@ def load_dataset(dataset_dir: Path | None = None) -> DatasetBundle:
         test_y=test_y,
         metadata=metadata,
     )
-    _validate_metadata(metadata, bundle)
+    _validate_metadata(metadata, bundle, horizon)
     return bundle
 
 
@@ -332,6 +340,7 @@ def run_experiment(
     seed: int,
     dataset_dir: Path | None = None,
     output_dir: Path | None = None,
+    horizon: int = DEFAULT_FORECAST_HORIZON,
     verbose: bool = False,
     quiet: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -339,7 +348,7 @@ def run_experiment(
 
     set_seed(seed)
     device = cpu_device()
-    bundle = load_dataset(dataset_dir)
+    bundle = load_dataset(dataset_dir, horizon=horizon)
     loaders = create_data_loaders(bundle, batch_size=batch_size, seed=seed)
     model = model_factory().to(device)
     parameter_count = count_parameters(model)
@@ -360,9 +369,9 @@ def run_experiment(
 
     model_metadata = {
         "model_type": model_type,
-        "dataset": DATASET_NAME,
+        "dataset": dataset_name(horizon),
         "input_window": INPUT_WINDOW,
-        "forecast_horizon": FORECAST_HORIZON,
+        "forecast_horizon": horizon,
         "input_size": INPUT_SIZE,
         "output_size": OUTPUT_SIZE,
         "hidden_size": hidden_size,
@@ -383,7 +392,7 @@ def run_experiment(
     }
     metrics = {
         "model_type": model_type,
-        "dataset": DATASET_NAME,
+        "dataset": dataset_name(horizon),
         "train_samples": bundle.train_x.shape[0],
         "validation_samples": bundle.validation_x.shape[0],
         "test_samples": bundle.test_x.shape[0],
@@ -408,7 +417,7 @@ def run_experiment(
         "history": history,
     }
 
-    destination = (output_dir or default_output_dir(model_type)).resolve()
+    destination = (output_dir or default_output_dir(model_type, horizon)).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), destination / "model.pt")
     write_json(destination / "model.json", model_metadata)
@@ -436,6 +445,12 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
     parser.add_argument("--epochs", type=_positive_int, default=25)
     parser.add_argument("--batch-size", type=_positive_int, default=32)
     parser.add_argument("--learning-rate", type=_positive_float, default=0.001)
+    parser.add_argument(
+        "--horizon",
+        type=_positive_int,
+        default=DEFAULT_FORECAST_HORIZON,
+        help="Passos a frente para prever; a janela de entrada permanece em 60 amostras.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     logging = parser.add_mutually_exclusive_group()
     logging.add_argument(
@@ -468,6 +483,7 @@ def run_model_cli(
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         seed=args.seed,
+        horizon=args.horizon,
         verbose=args.verbose,
         quiet=args.quiet,
     )

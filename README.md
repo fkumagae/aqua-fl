@@ -253,13 +253,22 @@ model.json     arquitetura e ambiente
 metrics.json   métricas, histórico e duração
 ```
 
+Para comparar um horizonte de **5 minutos** mantendo a mesma janela de entrada de **10 minutos**, crie um segundo dataset e selecione `--horizon 30` no treino:
+
+```bash
+python -m fluxos.edgebox.benchmark.prepare_dataset --window 60 --horizon 30
+python -m fluxos.edgebox.models.gru --horizon 30 --epochs 25 --batch-size 32 --learning-rate 0.001
+```
+
+Repita o segundo comando para `linear`, `mlp`, `rnn` e `lstm`. Os novos resultados ficam em `dados/edgebox/models/<topologia>/w60_h30/`, sem sobrescrever `w60_h60`. As métricas de 25 épocas apresentadas acima são apenas de `w60_h60`; ainda não há resultados reais de `w60_h30`.
+
 ## Testes
 
 ```bash
 python -m unittest tests.test_forecasting_models -v
 ```
 
-A suíte cobre as cinco topologias, shapes, backward, CPU, contagem de parâmetros, round-trip de `state_dict` e smoke training temporário.
+A suíte cobre as cinco topologias, shapes, backward, CPU, contagem de parâmetros, round-trip de `state_dict` e smoke training temporário nos horizontes 30 e 60.
 
 ## Estrutura do repositório
 

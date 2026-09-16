@@ -253,13 +253,22 @@ model.json     architecture and environment
 metrics.json   metrics, history, and duration
 ```
 
+To compare a **five-minute** horizon while keeping the same **ten-minute** input window, prepare a second dataset and select `--horizon 30` during training:
+
+```bash
+python -m fluxos.edgebox.benchmark.prepare_dataset --window 60 --horizon 30
+python -m fluxos.edgebox.models.gru --horizon 30 --epochs 25 --batch-size 32 --learning-rate 0.001
+```
+
+Repeat the second command for `linear`, `mlp`, `rnn`, and `lstm`. New results are saved under `dados/edgebox/models/<topology>/w60_h30/` without overwriting `w60_h60`. The 25-epoch results above belong only to `w60_h60`; real `w60_h30` results are not yet available.
+
 ## Tests
 
 ```bash
 python -m unittest tests.test_forecasting_models -v
 ```
 
-The suite covers all five topologies, shapes, backward, CPU execution, parameter counts, `state_dict` round-trips, and temporary smoke training.
+The suite covers all five topologies, shapes, backward, CPU execution, parameter counts, `state_dict` round-trips, and temporary smoke training for horizons 30 and 60.
 
 ## Repository layout
 
