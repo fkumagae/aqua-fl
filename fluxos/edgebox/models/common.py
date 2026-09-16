@@ -452,6 +452,18 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
         help="Passos a frente para prever; a janela de entrada permanece em 60 amostras.",
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--dataset-dir",
+        type=Path,
+        default=None,
+        help="Diretorio do dataset preparado; por padrao usa dados/edgebox/processed no projeto.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Diretorio para pesos e metricas; por padrao usa dados/edgebox/models no projeto.",
+    )
     logging = parser.add_mutually_exclusive_group()
     logging.add_argument(
         "--verbose",
@@ -484,6 +496,8 @@ def run_model_cli(
         learning_rate=args.learning_rate,
         seed=args.seed,
         horizon=args.horizon,
+        dataset_dir=args.dataset_dir,
+        output_dir=args.output_dir,
         verbose=args.verbose,
         quiet=args.quiet,
     )

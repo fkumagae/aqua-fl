@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import torch
@@ -16,6 +17,7 @@ from fluxos.edgebox.models.common import (
     default_dataset_dir,
     default_output_dir,
     load_dataset,
+    parse_training_args,
     run_experiment,
 )
 from fluxos.edgebox.models.gru import build_model as build_gru
@@ -35,6 +37,19 @@ MODEL_CASES = {
 
 
 class ForecastModelTests(unittest.TestCase):
+    def test_cli_accepts_horizon_and_explicit_paths(self) -> None:
+        arguments = [
+            "gru",
+            "--horizon", "30",
+            "--dataset-dir", "/tmp/forecast_w60_h30",
+            "--output-dir", "/tmp/gru/w60_h30",
+        ]
+        with patch("sys.argv", arguments):
+            parsed = parse_training_args("gru")
+        self.assertEqual(parsed.horizon, 30)
+        self.assertEqual(parsed.dataset_dir, Path("/tmp/forecast_w60_h30"))
+        self.assertEqual(parsed.output_dir, Path("/tmp/gru/w60_h30"))
+
     def test_forward_backward_state_dict_parameters_and_cpu(self) -> None:
         inputs = torch.randn(8, 60, 6, device="cpu")
         targets = torch.randn(8, 6, device="cpu")

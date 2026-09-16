@@ -262,6 +262,8 @@ python -m fluxos.edgebox.models.gru --horizon 30 --epochs 25 --batch-size 32 --l
 
 Repita o segundo comando para `linear`, `mlp`, `rnn` e `lstm`. Os novos resultados ficam em `dados/edgebox/models/<topologia>/w60_h30/`, sem sobrescrever `w60_h60`. As métricas de 25 épocas apresentadas acima são apenas de `w60_h60`; ainda não há resultados reais de `w60_h30`.
 
+Se o código estiver em um checkout de teste separado, use `--source` e `--output-dir` no preparador, e `--dataset-dir` e `--output-dir` no treino para apontar aos dados persistentes da TV Box. O código valida que o horizonte selecionado corresponde ao `metadata.json` do dataset.
+
 ## Testes
 
 ```bash

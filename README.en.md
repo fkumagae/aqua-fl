@@ -262,6 +262,8 @@ python -m fluxos.edgebox.models.gru --horizon 30 --epochs 25 --batch-size 32 --l
 
 Repeat the second command for `linear`, `mlp`, `rnn`, and `lstm`. New results are saved under `dados/edgebox/models/<topology>/w60_h30/` without overwriting `w60_h60`. The 25-epoch results above belong only to `w60_h60`; real `w60_h30` results are not yet available.
 
+When running code from a separate test checkout, use `--source` and `--output-dir` in the dataset preparer, then `--dataset-dir` and `--output-dir` in training to target persistent TV Box data. The selected horizon must match the dataset's `metadata.json`.
+
 ## Tests
 
 ```bash

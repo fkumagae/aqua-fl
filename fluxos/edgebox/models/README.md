@@ -27,6 +27,10 @@ Repeat the second command for `mlp`, `rnn`, `gru`, and `lstm`. Outputs go to
 `dados/edgebox/models/<model>/w60_h30/`; the existing `w60_h60` outputs are not
 overwritten. Omitting `--horizon` retains the original 60-step default.
 
+When running code from a separate checkout, use `--dataset-dir` and
+`--output-dir` to keep the prepared data and weights in the operational
+directory. The dataset metadata must match the selected horizon.
+
 Progress is shown once per epoch by default. Use `--verbose` to also show every
 batch or `--quiet` when an automated benchmark should minimize terminal I/O.
 
