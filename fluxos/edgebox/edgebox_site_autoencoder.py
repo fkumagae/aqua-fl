@@ -4,7 +4,7 @@ from datetime import datetime
 
 from config import EDGEBOX_DATA_DIR, WEB_DIR
 
-INDEX_PATH = WEB_DIR / "index.html"
+INDEX_PATH = WEB_DIR / "legacy.html"
 DASHBOARD_PATH = WEB_DIR / "dashboard.html"
 AE_PATH = EDGEBOX_DATA_DIR / "edgebox_autoencoder_latest.json"
 

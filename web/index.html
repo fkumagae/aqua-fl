@@ -1,1447 +1,1777 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="10">
-    <title>EdgeBox FL - Nó de Borda</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 28px;
-            background: #0f172a;
-            color: #e5e7eb;
-            font-family: Arial, sans-serif;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AquaFL — Edge Intelligence</title>
 
-        h1 {
-            margin: 0;
-            font-size: 42px;
-            text-align: center;
-        }
+<style>
+:root{
+  --bg:#031015;
+  --bg2:#061820;
+  --panel:#081d26;
+  --panel2:#0b242e;
+  --line:rgba(87,205,232,.13);
+  --text:#edfaff;
+  --muted:#6f919e;
+  --cyan:#27d6ef;
+  --cyan2:#159fbd;
+  --green:#4ce6ad;
+  --yellow:#f2c45d;
+  --red:#ff6677;
+}
 
-        .subtitle {
-            text-align: center;
-            color: #cbd5e1;
-            margin-top: 8px;
-            margin-bottom: 24px;
-        }
+*{
+  box-sizing:border-box;
+}
 
-        .status {
-            max-width: 900px;
-            margin: 0 auto 24px auto;
-            padding: 20px;
-            border-radius: 18px;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-        }
+html{
+  scroll-behavior:smooth;
+}
 
-        .stable { background: #14532d; }
-        .attention { background: #854d0e; }
-        .alert { background: #9a3412; }
-        .critical { background: #7f1d1d; }
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 10% 0%,rgba(22,191,222,.10),transparent 30%),
+    radial-gradient(circle at 90% 80%,rgba(26,137,175,.08),transparent 26%),
+    var(--bg);
+  color:var(--text);
+  font-family:Arial,Helvetica,sans-serif;
+}
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-            gap: 16px;
-            margin-bottom: 26px;
-        }
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.012) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.012) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:linear-gradient(to bottom,black,transparent 75%);
+}
 
-        .card {
-            background: #1e293b;
-            border-radius: 16px;
-            padding: 18px;
-            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-        }
+header{
+  height:76px;
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 38px;
+  background:rgba(3,16,21,.88);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--line);
+}
 
-        .card h2 {
-            margin-top: 0;
-            font-size: 16px;
-            color: #93c5fd;
-        }
+.brand{
+  display:flex;
+  align-items:center;
+  gap:15px;
+}
 
-        .value {
-            font-size: 28px;
-            font-weight: bold;
-        }
+.logo{
+  width:32px;
+  height:40px;
+  border-radius:60% 40% 60% 40%;
+  transform:rotate(45deg);
+  background:linear-gradient(140deg,#55edff,#0f89ab);
+  box-shadow:0 0 28px rgba(39,214,239,.20);
+}
 
-        .small {
-            color: #cbd5e1;
-            font-size: 14px;
-        }
+.brand h1{
+  margin:0;
+  font-size:22px;
+  letter-spacing:.7px;
+}
 
-        .section {
-            background: #111827;
-            border-radius: 18px;
-            padding: 22px;
-            margin-bottom: 26px;
-        }
+.brand p{
+  margin:4px 0 0;
+  font-size:9px;
+  color:#668a98;
+  letter-spacing:2.5px;
+}
 
-        .section h2 {
-            margin-top: 0;
-        }
+.header-right{
+  display:flex;
+  align-items:center;
+  gap:22px;
+}
 
-        .chart {
-            background: #1e293b;
-            border-radius: 16px;
-            padding: 16px;
-            margin-bottom: 16px;
-        }
+.live{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--green);
+  font-size:11px;
+  letter-spacing:.8px;
+}
 
-        .chart h3 {
-            margin-top: 0;
-            color: #bfdbfe;
-        }
+.live-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 12px var(--green);
+}
 
-        svg {
-            width: 100%;
-            height: 160px;
-            background: #020617;
-            border-radius: 10px;
-        }
+.clock{
+  color:#678795;
+  font-size:11px;
+}
 
-        polyline {
-            fill: none;
-            stroke: #38bdf8;
-            stroke-width: 4;
-        }
+main{
+  width:min(1480px,calc(100% - 56px));
+  margin:auto;
+  padding:42px 0 60px;
+}
 
-        code {
-            color: #86efac;
-        }
+.hero{
+  min-height:290px;
+  display:grid;
+  grid-template-columns:1.45fr .75fr;
+  gap:22px;
+  align-items:stretch;
+}
 
-        .footer {
-            text-align: center;
-            color: #94a3b8;
-            font-size: 14px;
-            margin-top: 28px;
-        }
-    </style>
+.hero-copy{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:18px 0;
+}
+
+.eyebrow{
+  color:var(--cyan);
+  font-size:10px;
+  letter-spacing:3px;
+  font-weight:bold;
+}
+
+.hero h2{
+  max-width:760px;
+  margin:13px 0 17px;
+  font-size:50px;
+  line-height:1.03;
+  letter-spacing:-1.8px;
+}
+
+.hero-copy>p{
+  max-width:720px;
+  margin:0;
+  color:#7395a3;
+  line-height:1.65;
+  font-size:16px;
+}
+
+.pills{
+  margin-top:25px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:9px;
+}
+
+.pill{
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:rgba(10,35,45,.55);
+  color:#84a4b1;
+  font-size:10px;
+}
+
+.pill.good{
+  color:var(--green);
+  border-color:rgba(76,230,173,.18);
+}
+
+.health{
+  position:relative;
+  overflow:hidden;
+  border-radius:22px;
+  border:1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 0%,rgba(39,214,239,.08),transparent 52%),
+    linear-gradient(145deg,#08202a,#061920);
+  padding:27px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+
+.health:after{
+  content:"";
+  position:absolute;
+  width:190px;
+  height:190px;
+  border:1px solid rgba(39,214,239,.07);
+  border-radius:50%;
+}
+
+.health-label{
+  z-index:1;
+  font-size:9px;
+  letter-spacing:2.5px;
+  color:#658b9a;
+}
+
+.health-value{
+  z-index:1;
+  margin-top:7px;
+  font-size:82px;
+  line-height:1;
+  font-weight:700;
+  letter-spacing:-5px;
+}
+
+.health-value small{
+  font-size:19px;
+  color:var(--cyan);
+  letter-spacing:0;
+}
+
+.health-state{
+  z-index:1;
+  margin-top:11px;
+  font-size:11px;
+  font-weight:bold;
+  color:var(--green);
+}
+
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:12px;
+  margin-top:23px;
+}
+
+.metric{
+  min-height:145px;
+  padding:19px;
+  position:relative;
+  overflow:hidden;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:linear-gradient(145deg,var(--panel),#071922);
+}
+
+.metric:after{
+  content:"";
+  position:absolute;
+  width:100px;
+  height:100px;
+  right:-47px;
+  top:-47px;
+  border-radius:50%;
+  background:rgba(39,214,239,.04);
+}
+
+.metric-name{
+  position:relative;
+  z-index:1;
+  color:#668795;
+  font-size:9px;
+  letter-spacing:1.8px;
+}
+
+.metric-value{
+  position:relative;
+  z-index:1;
+  margin-top:24px;
+  font-size:31px;
+  font-weight:700;
+  letter-spacing:-1px;
+}
+
+.metric-unit{
+  color:var(--cyan);
+  font-size:11px;
+  margin-left:3px;
+}
+
+.metric-desc{
+  position:relative;
+  z-index:1;
+  margin-top:7px;
+  color:#486674;
+  font-size:9px;
+}
+
+.section-grid{
+  margin-top:13px;
+  display:grid;
+  grid-template-columns:1.7fr .8fr;
+  gap:13px;
+}
+
+.card{
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:linear-gradient(145deg,rgba(8,29,38,.96),rgba(5,22,29,.96));
+  padding:22px;
+}
+
+.card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:15px;
+  margin-bottom:18px;
+}
+
+.card-head h3{
+  margin:0;
+  font-size:14px;
+}
+
+.card-head p{
+  margin:5px 0 0;
+  color:#587887;
+  font-size:10px;
+}
+
+.badge{
+  padding:7px 10px;
+  border-radius:999px;
+  background:rgba(39,214,239,.06);
+  border:1px solid rgba(39,214,239,.12);
+  color:#6eabba;
+  font-size:9px;
+  letter-spacing:1px;
+}
+
+.chart{
+  height:310px;
+}
+
+canvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+
+.legend{
+  margin-top:13px;
+  display:flex;
+  gap:18px;
+  color:#688896;
+  font-size:9px;
+}
+
+.legend-item{
+  display:flex;
+  gap:7px;
+  align-items:center;
+}
+
+.legend-dot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+}
+
+.system-panel{
+  display:flex;
+  flex-direction:column;
+}
+
+.risk{
+  min-height:175px;
+  border-radius:15px;
+  background:#061820;
+  border:1px solid rgba(83,190,220,.08);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+}
+
+.risk-value{
+  font-size:49px;
+  font-weight:700;
+}
+
+.risk-label{
+  margin-top:5px;
+  color:#60818f;
+  font-size:9px;
+  letter-spacing:2px;
+}
+
+.info-row{
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  padding:12px 2px;
+  border-bottom:1px solid rgba(90,190,215,.07);
+  font-size:11px;
+}
+
+.info-row span{
+  color:#668795;
+}
+
+.info-row strong{
+  text-align:right;
+  font-weight:500;
+}
+
+.fl-section{
+  margin-top:13px;
+  display:grid;
+  grid-template-columns:1.35fr .65fr;
+  gap:13px;
+}
+
+.network{
+  position:relative;
+  min-height:300px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.global-node{
+  position:relative;
+  z-index:4;
+  width:145px;
+  height:145px;
+  border-radius:50%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  background:#0a2833;
+  border:1px solid rgba(39,214,239,.27);
+  box-shadow:0 0 50px rgba(39,214,239,.06);
+}
+
+.global-node strong{
+  font-size:15px;
+}
+
+.global-node span{
+  margin-top:5px;
+  color:#5f8797;
+  font-size:9px;
+}
+
+.node{
+  position:absolute;
+  z-index:4;
+  width:115px;
+  padding:15px;
+  border-radius:13px;
+  background:#071b24;
+  border:1px solid rgba(85,194,220,.12);
+  text-align:center;
+}
+
+.node strong{
+  font-size:12px;
+}
+
+.node span{
+  display:block;
+  color:var(--green);
+  font-size:8px;
+  margin-top:6px;
+}
+
+.n1{left:9%;top:22%}
+.n2{right:9%;top:22%}
+.n3{left:50%;bottom:3%;transform:translateX(-50%)}
+
+.link{
+  position:absolute;
+  z-index:1;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(39,214,239,.30),transparent);
+  transform-origin:center;
+}
+
+.l1{
+  width:31%;
+  left:19%;
+  top:43%;
+  transform:rotate(9deg);
+}
+
+.l2{
+  width:31%;
+  right:19%;
+  top:43%;
+  transform:rotate(-9deg);
+}
+
+.l3{
+  width:20%;
+  left:40%;
+  top:69%;
+  transform:rotate(90deg);
+}
+
+.quick{
+  display:grid;
+  gap:10px;
+}
+
+.quick a{
+  text-decoration:none;
+  color:inherit;
+}
+
+.quick-item{
+  min-height:83px;
+  border-radius:13px;
+  border:1px solid rgba(80,190,215,.10);
+  background:#071a22;
+  padding:15px;
+  transition:.2s;
+}
+
+.quick-item:hover{
+  border-color:rgba(39,214,239,.28);
+  transform:translateY(-1px);
+}
+
+.quick-item strong{
+  display:block;
+  font-size:12px;
+}
+
+.quick-item p{
+  margin:6px 0 0;
+  color:#5d7d8a;
+  font-size:9px;
+  line-height:1.4;
+}
+
+.footer{
+  margin-top:19px;
+  padding-top:17px;
+  border-top:1px solid rgba(80,180,210,.07);
+  display:flex;
+  justify-content:space-between;
+  color:#395965;
+  font-size:8px;
+  letter-spacing:1.7px;
+}
+
+.offline{
+  color:var(--red)!important;
+}
+
+@media(max-width:1100px){
+  .metrics{
+    grid-template-columns:repeat(3,1fr);
+  }
+
+  .section-grid,
+  .fl-section{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(max-width:760px){
+  main{
+    width:calc(100% - 28px);
+  }
+
+  header{
+    padding:0 16px;
+  }
+
+  .hero{
+    grid-template-columns:1fr;
+  }
+
+  .hero h2{
+    font-size:38px;
+  }
+
+  .metrics{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .clock{
+    display:none;
+  }
+}
+</style>
 </head>
+
 <body>
-    <h1>EdgeBox FL</h1>
-    <p class="subtitle">
-        Validação de TV Box reaproveitada como nó de coleta, processamento local e inteligência de borda
-    </p>
 
-    <div class="status stable">
-        Status do nó: ESTÁVEL | Risco operacional: 0.07
+<header>
+
+<div class="brand">
+  <div class="logo"></div>
+  <div>
+    <h1>AquaFL</h1>
+    <p>EDGE INTELLIGENCE PLATFORM</p>
+  </div>
+</div>
+
+<div class="header-right">
+
+  <div class="live">
+    <div class="live-dot"></div>
+    <span id="connection">CONECTANDO</span>
+  </div>
+
+  <div class="clock" id="clock">--:--:--</div>
+
+</div>
+
+</header>
+
+
+<main>
+
+<section class="hero">
+
+<div class="hero-copy">
+
+  <div class="eyebrow">DISTRIBUTED EDGE COMPUTING</div>
+
+  <h2>Inteligência onde os dados acontecem.</h2>
+
+  <p>
+    Coleta, processamento local e inteligência distribuída executados
+    diretamente na EdgeBox AquaFL.
+  </p>
+
+  <div class="pills">
+    <div class="pill good">● EDGEBOX ATIVA</div>
+    <div class="pill">FEDERATED LEARNING</div>
+    <div class="pill">ANOMALY DETECTION</div>
+    <div class="pill" id="nodeName">NODE —</div>
+  </div>
+
+</div>
+
+
+<div class="health">
+
+  <div class="health-label">OPERATIONAL HEALTH</div>
+
+  <div class="health-value">
+    <span id="health">--</span><small>%</small>
+  </div>
+
+  <div class="health-state" id="healthState">
+    ANALISANDO SISTEMA
+  </div>
+
+</div>
+
+</section>
+
+
+<section class="metrics">
+
+<div class="metric">
+  <div class="metric-name">CPU LOAD</div>
+  <div class="metric-value">
+    <span id="cpu">--</span><span class="metric-unit">%</span>
+  </div>
+  <div class="metric-desc">Processamento instantâneo</div>
+</div>
+
+<div class="metric">
+  <div class="metric-name">MEMORY</div>
+  <div class="metric-value">
+    <span id="ram">--</span><span class="metric-unit">%</span>
+  </div>
+  <div class="metric-desc">Memória RAM utilizada</div>
+</div>
+
+<div class="metric">
+  <div class="metric-name">TEMPERATURE</div>
+  <div class="metric-value">
+    <span id="temperature">--</span><span class="metric-unit">°C</span>
+  </div>
+  <div class="metric-desc">Temperatura da EdgeBox</div>
+</div>
+
+<div class="metric">
+  <div class="metric-name">DISK</div>
+  <div class="metric-value">
+    <span id="disk">--</span><span class="metric-unit">%</span>
+  </div>
+  <div class="metric-desc">Armazenamento utilizado</div>
+</div>
+
+<div class="metric">
+  <div class="metric-name">LATENCY</div>
+  <div class="metric-value">
+    <span id="latency">--</span><span class="metric-unit">ms</span>
+  </div>
+  <div class="metric-desc">Resposta de rede</div>
+</div>
+
+<div class="metric">
+  <div class="metric-name">NETWORK</div>
+  <div class="metric-value">
+    <span id="network">--</span><span class="metric-unit">kbps</span>
+  </div>
+  <div class="metric-desc">Tráfego atual</div>
+</div>
+
+</section>
+
+
+<section class="section-grid">
+
+<div class="card">
+
+  <div class="card-head">
+    <div>
+      <h3>Telemetria da EdgeBox</h3>
+      <p>Histórico recente de CPU, memória e temperatura.</p>
     </div>
 
-    <div class="grid">
-        <div class="card">
-            <h2>Nó</h2>
-            <div class="value">tvbox</div>
-            <p class="small">Função: edge node</p>
-        </div>
+    <div class="badge">LIVE TELEMETRY</div>
+  </div>
 
-        <div class="card">
-            <h2>CPU</h2>
-            <div class="value">35.3%</div>
-            <p class="small">Uso instantâneo do processador</p>
-        </div>
+  <div class="chart">
+    <canvas id="telemetryChart"></canvas>
+  </div>
 
-        <div class="card">
-            <h2>Memória RAM</h2>
-            <div class="value">69.3%</div>
-            <p class="small">1263 MB / 1823 MB</p>
-        </div>
+  <div class="legend">
 
-        <div class="card">
-            <h2>Temperatura</h2>
-            <div class="value">42.5 °C</div>
-            <p class="small">Leitura interna do SoC</p>
-        </div>
-
-        <div class="card">
-            <h2>Disco</h2>
-            <div class="value">29.5%</div>
-            <p class="small">8.32 GB / 28.21 GB</p>
-        </div>
-
-        <div class="card">
-            <h2>Latência</h2>
-            <div class="value">8.7 ms</div>
-            <p class="small">Teste ICMP para 8.8.8.8</p>
-        </div>
-
-        <div class="card">
-            <h2>Rede</h2>
-            <div class="value">14.6 kbps</div>
-            <p class="small">RX atual | TX: 27.6 kbps</p>
-        </div>
-
-        <div class="card">
-            <h2>Uptime</h2>
-            <div class="value">8d 0h 20min</div>
-            <p class="small">Tempo ligado sem reiniciar</p>
-        </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#27d6ef"></div>
+      CPU
     </div>
 
-    <div class="section">
-        <h2>Pipeline validado</h2>
-        <p>
-            Este nó coleta dados internos da TV Box, salva histórico local, processa os dados,
-            roda um modelo leve de inferência e gera uma atualização de modelo que pode ser enviada
-            a um servidor agregador federado.
-        </p>
-        <p>
-            <b>Coleta → armazenamento → modelo local → inferência → atualização federada → dashboard</b>
-        </p>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#4ce6ad"></div>
+      RAM
     </div>
 
-    <div class="section">
-        <h2>Modelo local</h2>
-        <p>
-            Modelo: <b>regressão linear leve</b> treinada localmente com os dados do próprio nó.
-        </p>
-        <p>
-            Amostras locais utilizadas: <b>300</b>
-        </p>
-        <p>
-            Pesos locais exportados em: <code>edgebox_model_update.json</code>
-        </p>
-        <p>
-            Pesos atuais: <code>[0.0506, 0.0125, 0.0076, 0.0024, 0.005, 0.0093, 0.0192]</code>
-        </p>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f2c45d"></div>
+      TEMPERATURA
     </div>
 
-    <div class="section">
-        <h2>Histórico recente</h2>
-        
-    <div class="chart">
-        <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px;">
-            <div>
-                <h3>Histórico de CPU</h3>
-                <p class="small">Uso da CPU. Quanto menor, melhor.</p>
-            </div>
+  </div>
 
-            <div style="text-align:right;min-width:150px;">
-                <div style="font-size:28px;font-weight:bold;">0.00%</div>
-                <div style="font-weight:bold;">NORMAL</div>
-            </div>
-        </div>
+</div>
 
-        <svg viewBox="0 0 900 260" preserveAspectRatio="none" style="width:100%;height:280px;background:#020617;border-radius:12px;">
-            <style>
-                .grid-line {
-                    stroke: #334155;
-                    stroke-width: 1;
-                }
 
-                .ref-line {
-                    stroke-width: 2;
-                    stroke-dasharray: 7 7;
-                }
+<div class="card system-panel">
 
-                .attention-line {
-                    stroke: #facc15;
-                }
-
-                .alert-line {
-                    stroke: #fb7185;
-                }
-
-                .ref-label {
-                    fill: #cbd5e1;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-
-                .axis-label {
-                    fill: #cbd5e1;
-                    font-size: 15px;
-                }
-
-                .metric-line {
-                    fill: none;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                    stroke-linecap: round;
-                    stroke-linejoin: round;
-                }
-
-                .data-point {
-                    fill: #0f172a;
-                    stroke: #38bdf8;
-                    stroke-width: 4;
-                    cursor: pointer;
-                }
-
-                .data-point:hover {
-                    fill: #ffffff;
-                    stroke: #ffffff;
-                }
-
-                .last-point {
-                    fill: #ffffff;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                }
-
-                .last-label {
-                    fill: #ffffff;
-                    font-size: 17px;
-                    font-weight: bold;
-                }
-            </style>
-
-            
-            <line x1="70" y1="212.0" x2="870" y2="212.0" class="grid-line" />
-        
-            <line x1="70" y1="164.5" x2="870" y2="164.5" class="grid-line" />
-        
-            <line x1="70" y1="117.0" x2="870" y2="117.0" class="grid-line" />
-        
-            <line x1="70" y1="69.5" x2="870" y2="69.5" class="grid-line" />
-        
-            <line x1="70" y1="22.0" x2="870" y2="22.0" class="grid-line" />
-        
-            
-            <text x="60" y="216.0" class="axis-label" text-anchor="end">0%</text>
-        
-            <text x="60" y="168.5" class="axis-label" text-anchor="end">25%</text>
-        
-            <text x="60" y="121.0" class="axis-label" text-anchor="end">50%</text>
-        
-            <text x="60" y="73.5" class="axis-label" text-anchor="end">75%</text>
-        
-            <text x="60" y="26.0" class="axis-label" text-anchor="end">100%</text>
-        
-            
-        <line x1="70" y1="117.0" x2="870" y2="117.0" class="ref-line attention-line" />
-        <text x="865" y="111.0" class="ref-label" text-anchor="end">atenção</text>
-
-        <line x1="70" y1="69.5" x2="870" y2="69.5" class="ref-line alert-line" />
-        <text x="865" y="63.5" class="ref-label" text-anchor="end">alerta</text>
-    
-
-            <line x1="70" y1="22" x2="70" y2="212" class="grid-line" />
-            <line x1="70" y1="212" x2="870" y2="212" class="grid-line" />
-
-            <polyline points="70.0,212.0 90.5,212.0 111.0,212.0 131.5,212.0 152.1,212.0 172.6,212.0 193.1,212.0 213.6,212.0 234.1,210.1 254.6,212.0 275.1,212.0 295.6,212.0 316.2,212.0 336.7,212.0 357.2,210.1 377.7,206.3 398.2,212.0 418.7,208.2 439.2,212.0 459.7,212.0 480.3,212.0 500.8,212.0 521.3,212.0 541.8,212.0 562.3,210.1 582.8,212.0 603.3,212.0 623.8,212.0 644.4,212.0 664.9,212.0 685.4,212.0 705.9,210.1 726.4,212.0 746.9,212.0 767.4,212.0 787.9,212.0 808.5,212.0 829.0,212.0 849.5,212.0 870.0,212.0" class="metric-line" />
-
-            
-            <circle cx="70.0" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:02:53
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="90.5" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:03:06
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="111.0" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:03:19
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="131.5" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:03:33
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="152.1" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:03:46
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="172.6" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:04:00
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="193.1" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:04:13
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="213.6" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:04:27
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="234.1" cy="210.1" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:04:40
-Valor: 1.00%</title>
-            </circle>
-        
-            <circle cx="254.6" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:04:53
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="275.1" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:05:07
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="295.6" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:05:20
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="316.2" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:05:34
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="336.7" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:05:47
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="357.2" cy="210.1" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:06:01
-Valor: 1.00%</title>
-            </circle>
-        
-            <circle cx="377.7" cy="206.3" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:06:14
-Valor: 3.00%</title>
-            </circle>
-        
-            <circle cx="398.2" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:06:28
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="418.7" cy="208.2" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:06:41
-Valor: 2.00%</title>
-            </circle>
-        
-            <circle cx="439.2" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:06:54
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="459.7" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:07:08
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="480.3" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:07:21
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="500.8" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:07:35
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="521.3" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:07:48
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="541.8" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:08:02
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="562.3" cy="210.1" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:08:15
-Valor: 1.00%</title>
-            </circle>
-        
-            <circle cx="582.8" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:08:28
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="603.3" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:08:42
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="623.8" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:08:55
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="644.4" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:09:09
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="664.9" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:09:22
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="685.4" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:09:36
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="705.9" cy="210.1" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:09:49
-Valor: 1.00%</title>
-            </circle>
-        
-            <circle cx="726.4" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:10:03
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="746.9" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:10:16
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="767.4" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:10:29
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="787.9" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:10:43
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="808.5" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:10:56
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="829.0" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:11:10
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="849.5" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:11:23
-Valor: 0.00%</title>
-            </circle>
-        
-            <circle cx="870.0" cy="212.0" r="5.5" class="data-point">
-                <title>Histórico de CPU
-Horário: 2026-07-02T16:11:37
-Valor: 0.00%</title>
-            </circle>
-        
-
-            <circle cx="870.0" cy="212.0" r="8" class="last-point">
-                <title>Valor atual: 0.00%</title>
-            </circle>
-
-            <text x="860.0" y="198.0" class="last-label" text-anchor="end">
-                0.00%
-            </text>
-
-            
-        <text x="70.0" y="242" class="axis-label" text-anchor="middle">início</text>
-        <text x="480.3" y="242" class="axis-label" text-anchor="middle">meio</text>
-        <text x="870.0" y="242" class="axis-label" text-anchor="middle">agora</text>
-    
-        </svg>
-
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;margin-bottom:8px;color:#dbeafe;">
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Primeiro: <b>0.00%</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Média: <b>0.23%</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Atual: <b>0.00%</b></span>
-        </div>
-
-        <div class="small">
-            Últimos valores: 
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            0.00%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            0.00%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            0.00%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            0.00%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            0.00%
-        </span>
-        
-        </div>
-    </div>
-    
-        
-    <div class="chart">
-        <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px;">
-            <div>
-                <h3>Histórico de RAM</h3>
-                <p class="small">Uso da memória RAM. Valores altos indicam pouca folga.</p>
-            </div>
-
-            <div style="text-align:right;min-width:150px;">
-                <div style="font-size:28px;font-weight:bold;">13.60%</div>
-                <div style="font-weight:bold;">NORMAL</div>
-            </div>
-        </div>
-
-        <svg viewBox="0 0 900 260" preserveAspectRatio="none" style="width:100%;height:280px;background:#020617;border-radius:12px;">
-            <style>
-                .grid-line {
-                    stroke: #334155;
-                    stroke-width: 1;
-                }
-
-                .ref-line {
-                    stroke-width: 2;
-                    stroke-dasharray: 7 7;
-                }
-
-                .attention-line {
-                    stroke: #facc15;
-                }
-
-                .alert-line {
-                    stroke: #fb7185;
-                }
-
-                .ref-label {
-                    fill: #cbd5e1;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-
-                .axis-label {
-                    fill: #cbd5e1;
-                    font-size: 15px;
-                }
-
-                .metric-line {
-                    fill: none;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                    stroke-linecap: round;
-                    stroke-linejoin: round;
-                }
-
-                .data-point {
-                    fill: #0f172a;
-                    stroke: #38bdf8;
-                    stroke-width: 4;
-                    cursor: pointer;
-                }
-
-                .data-point:hover {
-                    fill: #ffffff;
-                    stroke: #ffffff;
-                }
-
-                .last-point {
-                    fill: #ffffff;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                }
-
-                .last-label {
-                    fill: #ffffff;
-                    font-size: 17px;
-                    font-weight: bold;
-                }
-            </style>
-
-            
-            <line x1="70" y1="212.0" x2="870" y2="212.0" class="grid-line" />
-        
-            <line x1="70" y1="164.5" x2="870" y2="164.5" class="grid-line" />
-        
-            <line x1="70" y1="117.0" x2="870" y2="117.0" class="grid-line" />
-        
-            <line x1="70" y1="69.5" x2="870" y2="69.5" class="grid-line" />
-        
-            <line x1="70" y1="22.0" x2="870" y2="22.0" class="grid-line" />
-        
-            
-            <text x="60" y="216.0" class="axis-label" text-anchor="end">0%</text>
-        
-            <text x="60" y="168.5" class="axis-label" text-anchor="end">25%</text>
-        
-            <text x="60" y="121.0" class="axis-label" text-anchor="end">50%</text>
-        
-            <text x="60" y="73.5" class="axis-label" text-anchor="end">75%</text>
-        
-            <text x="60" y="26.0" class="axis-label" text-anchor="end">100%</text>
-        
-            
-        <line x1="70" y1="98.0" x2="870" y2="98.0" class="ref-line attention-line" />
-        <text x="865" y="92.0" class="ref-label" text-anchor="end">atenção</text>
-
-        <line x1="70" y1="60.0" x2="870" y2="60.0" class="ref-line alert-line" />
-        <text x="865" y="54.0" class="ref-label" text-anchor="end">alerta</text>
-    
-
-            <line x1="70" y1="22" x2="70" y2="212" class="grid-line" />
-            <line x1="70" y1="212" x2="870" y2="212" class="grid-line" />
-
-            <polyline points="70.0,185.0 90.5,185.0 111.0,184.8 131.5,185.0 152.1,185.0 172.6,185.0 193.1,185.2 213.6,186.9 234.1,185.2 254.6,186.5 275.1,186.5 295.6,186.5 316.2,186.0 336.7,186.0 357.2,186.2 377.7,186.3 398.2,186.2 418.7,186.7 439.2,185.8 459.7,186.0 480.3,185.8 500.8,186.2 521.3,186.2 541.8,186.3 562.3,186.3 582.8,186.0 603.3,186.2 623.8,186.3 644.4,186.0 664.9,186.5 685.4,187.3 705.9,186.2 726.4,186.2 746.9,186.7 767.4,186.3 787.9,186.3 808.5,186.5 829.0,186.7 849.5,186.2 870.0,186.2" class="metric-line" />
-
-            
-            <circle cx="70.0" cy="185.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:02:53
-Valor: 14.20%</title>
-            </circle>
-        
-            <circle cx="90.5" cy="185.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:03:06
-Valor: 14.20%</title>
-            </circle>
-        
-            <circle cx="111.0" cy="184.8" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:03:19
-Valor: 14.30%</title>
-            </circle>
-        
-            <circle cx="131.5" cy="185.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:03:33
-Valor: 14.20%</title>
-            </circle>
-        
-            <circle cx="152.1" cy="185.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:03:46
-Valor: 14.20%</title>
-            </circle>
-        
-            <circle cx="172.6" cy="185.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:04:00
-Valor: 14.20%</title>
-            </circle>
-        
-            <circle cx="193.1" cy="185.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:04:13
-Valor: 14.10%</title>
-            </circle>
-        
-            <circle cx="213.6" cy="186.9" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:04:27
-Valor: 13.20%</title>
-            </circle>
-        
-            <circle cx="234.1" cy="185.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:04:40
-Valor: 14.10%</title>
-            </circle>
-        
-            <circle cx="254.6" cy="186.5" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:04:53
-Valor: 13.40%</title>
-            </circle>
-        
-            <circle cx="275.1" cy="186.5" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:05:07
-Valor: 13.40%</title>
-            </circle>
-        
-            <circle cx="295.6" cy="186.5" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:05:20
-Valor: 13.40%</title>
-            </circle>
-        
-            <circle cx="316.2" cy="186.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:05:34
-Valor: 13.70%</title>
-            </circle>
-        
-            <circle cx="336.7" cy="186.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:05:47
-Valor: 13.70%</title>
-            </circle>
-        
-            <circle cx="357.2" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:06:01
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="377.7" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:06:14
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="398.2" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:06:28
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="418.7" cy="186.7" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:06:41
-Valor: 13.30%</title>
-            </circle>
-        
-            <circle cx="439.2" cy="185.8" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:06:54
-Valor: 13.80%</title>
-            </circle>
-        
-            <circle cx="459.7" cy="186.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:07:08
-Valor: 13.70%</title>
-            </circle>
-        
-            <circle cx="480.3" cy="185.8" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:07:21
-Valor: 13.80%</title>
-            </circle>
-        
-            <circle cx="500.8" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:07:35
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="521.3" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:07:48
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="541.8" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:08:02
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="562.3" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:08:15
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="582.8" cy="186.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:08:28
-Valor: 13.70%</title>
-            </circle>
-        
-            <circle cx="603.3" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:08:42
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="623.8" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:08:55
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="644.4" cy="186.0" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:09:09
-Valor: 13.70%</title>
-            </circle>
-        
-            <circle cx="664.9" cy="186.5" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:09:22
-Valor: 13.40%</title>
-            </circle>
-        
-            <circle cx="685.4" cy="187.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:09:36
-Valor: 13.00%</title>
-            </circle>
-        
-            <circle cx="705.9" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:09:49
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="726.4" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:10:03
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="746.9" cy="186.7" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:10:16
-Valor: 13.30%</title>
-            </circle>
-        
-            <circle cx="767.4" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:10:29
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="787.9" cy="186.3" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:10:43
-Valor: 13.50%</title>
-            </circle>
-        
-            <circle cx="808.5" cy="186.5" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:10:56
-Valor: 13.40%</title>
-            </circle>
-        
-            <circle cx="829.0" cy="186.7" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:11:10
-Valor: 13.30%</title>
-            </circle>
-        
-            <circle cx="849.5" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:11:23
-Valor: 13.60%</title>
-            </circle>
-        
-            <circle cx="870.0" cy="186.2" r="5.5" class="data-point">
-                <title>Histórico de RAM
-Horário: 2026-07-02T16:11:37
-Valor: 13.60%</title>
-            </circle>
-        
-
-            <circle cx="870.0" cy="186.2" r="8" class="last-point">
-                <title>Valor atual: 13.60%</title>
-            </circle>
-
-            <text x="860.0" y="172.2" class="last-label" text-anchor="end">
-                13.60%
-            </text>
-
-            
-        <text x="70.0" y="242" class="axis-label" text-anchor="middle">início</text>
-        <text x="480.3" y="242" class="axis-label" text-anchor="middle">meio</text>
-        <text x="870.0" y="242" class="axis-label" text-anchor="middle">agora</text>
-    
-        </svg>
-
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;margin-bottom:8px;color:#dbeafe;">
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Primeiro: <b>14.20%</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Média: <b>13.65%</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Atual: <b>13.60%</b></span>
-        </div>
-
-        <div class="small">
-            Últimos valores: 
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            13.50%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            13.40%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            13.30%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            13.60%
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            13.60%
-        </span>
-        
-        </div>
-    </div>
-    
-        
-    <div class="chart">
-        <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:12px;">
-            <div>
-                <h3>Histórico de Temperatura</h3>
-                <p class="small">Temperatura interna da TV Box.</p>
-            </div>
-
-            <div style="text-align:right;min-width:150px;">
-                <div style="font-size:28px;font-weight:bold;">35.50 °C</div>
-                <div style="font-weight:bold;">NORMAL</div>
-            </div>
-        </div>
-
-        <svg viewBox="0 0 900 260" preserveAspectRatio="none" style="width:100%;height:280px;background:#020617;border-radius:12px;">
-            <style>
-                .grid-line {
-                    stroke: #334155;
-                    stroke-width: 1;
-                }
-
-                .ref-line {
-                    stroke-width: 2;
-                    stroke-dasharray: 7 7;
-                }
-
-                .attention-line {
-                    stroke: #facc15;
-                }
-
-                .alert-line {
-                    stroke: #fb7185;
-                }
-
-                .ref-label {
-                    fill: #cbd5e1;
-                    font-size: 16px;
-                    font-weight: bold;
-                }
-
-                .axis-label {
-                    fill: #cbd5e1;
-                    font-size: 15px;
-                }
-
-                .metric-line {
-                    fill: none;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                    stroke-linecap: round;
-                    stroke-linejoin: round;
-                }
-
-                .data-point {
-                    fill: #0f172a;
-                    stroke: #38bdf8;
-                    stroke-width: 4;
-                    cursor: pointer;
-                }
-
-                .data-point:hover {
-                    fill: #ffffff;
-                    stroke: #ffffff;
-                }
-
-                .last-point {
-                    fill: #ffffff;
-                    stroke: #38bdf8;
-                    stroke-width: 5;
-                }
-
-                .last-label {
-                    fill: #ffffff;
-                    font-size: 17px;
-                    font-weight: bold;
-                }
-            </style>
-
-            
-            <line x1="70" y1="212.0" x2="870" y2="212.0" class="grid-line" />
-        
-            <line x1="70" y1="171.3" x2="870" y2="171.3" class="grid-line" />
-        
-            <line x1="70" y1="130.6" x2="870" y2="130.6" class="grid-line" />
-        
-            <line x1="70" y1="89.9" x2="870" y2="89.9" class="grid-line" />
-        
-            <line x1="70" y1="49.1" x2="870" y2="49.1" class="grid-line" />
-        
-            <line x1="70" y1="22.0" x2="870" y2="22.0" class="grid-line" />
-        
-            
-            <text x="60" y="216.0" class="axis-label" text-anchor="end">20 °C</text>
-        
-            <text x="60" y="175.3" class="axis-label" text-anchor="end">35 °C</text>
-        
-            <text x="60" y="134.6" class="axis-label" text-anchor="end">50 °C</text>
-        
-            <text x="60" y="93.9" class="axis-label" text-anchor="end">65 °C</text>
-        
-            <text x="60" y="53.1" class="axis-label" text-anchor="end">80 °C</text>
-        
-            <text x="60" y="26.0" class="axis-label" text-anchor="end">90 °C</text>
-        
-            
-        <line x1="70" y1="117.0" x2="870" y2="117.0" class="ref-line attention-line" />
-        <text x="865" y="111.0" class="ref-label" text-anchor="end">atenção</text>
-
-        <line x1="70" y1="76.3" x2="870" y2="76.3" class="ref-line alert-line" />
-        <text x="865" y="70.3" class="ref-label" text-anchor="end">alerta</text>
-    
-
-            <line x1="70" y1="22" x2="70" y2="212" class="grid-line" />
-            <line x1="70" y1="212" x2="870" y2="212" class="grid-line" />
-
-            <polyline points="70.0,170.5 90.5,169.9 111.0,170.5 131.5,170.2 152.1,170.7 172.6,170.2 193.1,170.2 213.6,170.2 234.1,170.5 254.6,170.2 275.1,170.5 295.6,170.2 316.2,170.5 336.7,170.2 357.2,170.2 377.7,169.7 398.2,170.5 418.7,169.9 439.2,170.5 459.7,170.2 480.3,170.2 500.8,169.9 521.3,170.5 541.8,169.9 562.3,170.2 582.8,169.9 603.3,170.2 623.8,170.2 644.4,170.2 664.9,169.9 685.4,170.5 705.9,169.9 726.4,170.5 746.9,169.9 767.4,170.2 787.9,169.9 808.5,170.2 829.0,170.2 849.5,170.2 870.0,169.9" class="metric-line" />
-
-            
-            <circle cx="70.0" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:02:53
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="90.5" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:03:06
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="111.0" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:03:19
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="131.5" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:03:33
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="152.1" cy="170.7" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:03:46
-Valor: 35.20 °C</title>
-            </circle>
-        
-            <circle cx="172.6" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:04:00
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="193.1" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:04:13
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="213.6" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:04:27
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="234.1" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:04:40
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="254.6" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:04:53
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="275.1" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:05:07
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="295.6" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:05:20
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="316.2" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:05:34
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="336.7" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:05:47
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="357.2" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:06:01
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="377.7" cy="169.7" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:06:14
-Valor: 35.60 °C</title>
-            </circle>
-        
-            <circle cx="398.2" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:06:28
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="418.7" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:06:41
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="439.2" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:06:54
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="459.7" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:07:08
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="480.3" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:07:21
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="500.8" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:07:35
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="521.3" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:07:48
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="541.8" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:08:02
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="562.3" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:08:15
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="582.8" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:08:28
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="603.3" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:08:42
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="623.8" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:08:55
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="644.4" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:09:09
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="664.9" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:09:22
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="685.4" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:09:36
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="705.9" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:09:49
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="726.4" cy="170.5" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:10:03
-Valor: 35.30 °C</title>
-            </circle>
-        
-            <circle cx="746.9" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:10:16
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="767.4" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:10:29
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="787.9" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:10:43
-Valor: 35.50 °C</title>
-            </circle>
-        
-            <circle cx="808.5" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:10:56
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="829.0" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:11:10
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="849.5" cy="170.2" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:11:23
-Valor: 35.40 °C</title>
-            </circle>
-        
-            <circle cx="870.0" cy="169.9" r="5.5" class="data-point">
-                <title>Histórico de Temperatura
-Horário: 2026-07-02T16:11:37
-Valor: 35.50 °C</title>
-            </circle>
-        
-
-            <circle cx="870.0" cy="169.9" r="8" class="last-point">
-                <title>Valor atual: 35.50 °C</title>
-            </circle>
-
-            <text x="860.0" y="155.9" class="last-label" text-anchor="end">
-                35.50 °C
-            </text>
-
-            
-        <text x="70.0" y="242" class="axis-label" text-anchor="middle">início</text>
-        <text x="480.3" y="242" class="axis-label" text-anchor="middle">meio</text>
-        <text x="870.0" y="242" class="axis-label" text-anchor="middle">agora</text>
-    
-        </svg>
-
-        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;margin-bottom:8px;color:#dbeafe;">
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Primeiro: <b>35.30 °C</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Média: <b>35.40 °C</b></span>
-            <span style="background:#0f172a;padding:8px 10px;border-radius:10px;">Atual: <b>35.50 °C</b></span>
-        </div>
-
-        <div class="small">
-            Últimos valores: 
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            35.50 °C
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            35.40 °C
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            35.40 °C
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            35.40 °C
-        </span>
-        
-        <span style="display:inline-block;background:#334155;color:#e5e7eb;padding:6px 9px;margin:4px;border-radius:999px;font-weight:bold;">
-            35.50 °C
-        </span>
-        
-        </div>
-    </div>
-    
-        
-        <div class="chart">
-            <h3>Histórico de Risco do Nó</h3>
-            <p class="small">Coletando dados suficientes para montar o gráfico...</p>
-        </div>
-        
+  <div class="card-head">
+    <div>
+      <h3>Estado operacional</h3>
+      <p>Avaliação atual da EdgeBox.</p>
     </div>
 
-    <div class="section">
-        <h2>Caminho de expansão</h2>
-        <p>
-            Depois de validar que a TV Box consegue operar como nó confiável de borda,
-            a mesma arquitetura pode receber sensores externos: temperatura, umidade,
-            chuva, nível da água, qualidade do ar, ruído, presença e dados comunitários.
-        </p>
-        <p>
-            Assim, antes de espalhar sensores pela cidade, o projeto valida se a infraestrutura
-            computacional realmente aguenta operar de forma contínua.
-        </p>
+    <div class="badge">HEALTH</div>
+  </div>
+
+  <div class="risk">
+    <div class="risk-value" id="risk">--</div>
+    <div class="risk-label">RISCO OPERACIONAL</div>
+  </div>
+
+  <div class="info-row">
+    <span>Uptime</span>
+    <strong id="uptime">--</strong>
+  </div>
+
+  <div class="info-row">
+    <span>RX</span>
+    <strong id="rx">--</strong>
+  </div>
+
+  <div class="info-row">
+    <span>TX</span>
+    <strong id="tx">--</strong>
+  </div>
+
+  <div class="info-row">
+    <span>Última atualização</span>
+    <strong id="lastUpdate">--</strong>
+  </div>
+
+</div>
+
+</section>
+
+
+<section class="fl-section">
+
+<div class="card">
+
+  <div class="card-head">
+
+    <div>
+      <h3>Federated Learning</h3>
+      <p>Arquitetura distribuída do AquaFL.</p>
     </div>
 
-    <div class="footer">
-        Última atualização: 2026-09-10T23:54:41 |
-        IPs: 192.168.3.63 100.106.224.0 fd88:8e68:8318:be00:4e5d:114c:8fa9:66a fd88:8e68:8318:be00:c122:270b:291a:8acb fd7a:115c:a1e0::aa38:e001 |
-        Atualização automática a cada 10s
+    <div class="badge">FEDAVG</div>
+
+  </div>
+
+
+  <div class="network">
+
+    <div class="link l1"></div>
+    <div class="link l2"></div>
+    <div class="link l3"></div>
+
+    <div class="node n1">
+      <strong>NODE 01</strong>
+      <span>● ONLINE</span>
     </div>
+
+    <div class="node n2">
+      <strong>NODE 02</strong>
+      <span>● ONLINE</span>
+    </div>
+
+    <div class="node n3">
+      <strong>NODE 03</strong>
+      <span>● ONLINE</span>
+    </div>
+
+    <div class="global-node">
+      <strong>GLOBAL</strong>
+      <strong>MODEL</strong>
+      <span>FEDAVG</span>
+    </div>
+
+  </div>
+
+</div>
+
+
+<div class="card">
+
+  <div class="card-head">
+    <div>
+      <h3>Inteligência local</h3>
+      <p>Ferramentas e modelos executados na EdgeBox.</p>
+    </div>
+  </div>
+
+
+  <div class="quick">
+
+    <a href="/web/autoencoder.html">
+      <div class="quick-item">
+        <strong>Autoencoder</strong>
+        <p>Detecção de anomalias e análise do erro de reconstrução.</p>
+      </div>
+    </a>
+
+    <a href="/web/legacy.html">
+      <div class="quick-item">
+        <strong>Dashboard técnico</strong>
+        <p>Acesse o painel legado com todos os detalhes e dados técnicos.</p>
+      </div>
+    </a>
+
+    <div class="quick-item">
+      <strong>Edge processing</strong>
+      <p>Coleta, armazenamento, inferência e atualização local de modelos.</p>
+    </div>
+
+  </div>
+
+</div>
+
+</section>
+
+
+<div class="footer">
+  <span>AQUAFL / EDGE COMPUTING PLATFORM</span>
+  <span id="footerStatus">AGUARDANDO DADOS</span>
+</div>
+
+</main>
+
+
+<script>
+
+const LIVE_URL="/web/edgebox_live.json";
+const HISTORY_URL="/web/edgebox_history.json";
+
+let historyData=[];
+
+
+function clock(){
+  document.getElementById("clock").textContent=
+    new Date().toLocaleTimeString();
+}
+
+setInterval(clock,1000);
+clock();
+
+
+function normalizeKey(k){
+  return String(k)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g,"");
+}
+
+
+function unwrapValue(value){
+
+  if(Array.isArray(value)){
+
+    for(let i=value.length-1;i>=0;i--){
+
+      const result=unwrapValue(value[i]);
+
+      if(
+        result!==undefined &&
+        result!==null &&
+        result!==""
+      ){
+        return result;
+      }
+
+    }
+
+    return undefined;
+  }
+
+  if(value && typeof value==="object"){
+
+    const preferred=[
+      "value",
+      "current",
+      "latest",
+      "last",
+      "actual",
+      "y"
+    ];
+
+    for(const key of preferred){
+
+      if(value[key]!==undefined){
+        return unwrapValue(value[key]);
+      }
+
+    }
+
+  }
+
+  return value;
+}
+
+
+function unwrapValue(value){
+
+  if(Array.isArray(value)){
+
+    for(let i=value.length-1;i>=0;i--){
+
+      const result=unwrapValue(value[i]);
+
+      if(
+        result!==undefined &&
+        result!==null &&
+        result!==""
+      ){
+        return result;
+      }
+
+    }
+
+    return undefined;
+  }
+
+  if(value && typeof value==="object"){
+
+    const preferred=[
+      "value",
+      "current",
+      "latest",
+      "last",
+      "actual",
+      "y"
+    ];
+
+    for(const key of preferred){
+
+      if(value[key]!==undefined){
+        return unwrapValue(value[key]);
+      }
+
+    }
+
+  }
+
+  return value;
+}
+
+
+function recursiveFind(obj,names){
+
+  if(obj===null || obj===undefined){
+    return undefined;
+  }
+
+  const wanted=names.map(normalizeKey);
+
+
+  if(Array.isArray(obj)){
+
+    for(let i=obj.length-1;i>=0;i--){
+
+      const result=
+        recursiveFind(obj[i],names);
+
+      if(result!==undefined){
+        return result;
+      }
+
+    }
+
+    return undefined;
+  }
+
+
+  if(typeof obj==="object"){
+
+    /*
+       Primeiro procura chave exata.
+    */
+    for(const [key,value] of Object.entries(obj)){
+
+      if(wanted.includes(normalizeKey(key))){
+        return unwrapValue(value);
+      }
+
+    }
+
+
+    /*
+       Depois entra em objetos e arrays.
+    */
+    for(const value of Object.values(obj)){
+
+      if(
+        value &&
+        typeof value==="object"
+      ){
+
+        const result=
+          recursiveFind(value,names);
+
+        if(result!==undefined){
+          return result;
+        }
+
+      }
+
+    }
+
+  }
+
+  return undefined;
+}
+
+
+function numberValue(value,fallback=0){
+
+  value=unwrapValue(value);
+
+  if(typeof value==="string"){
+
+    value=value
+      .replace(",",".")
+      .replace(/[^0-9.\-]/g,"");
+
+  }
+
+  const n=Number(value);
+
+  return Number.isFinite(n)?n:fallback;
+}
+
+
+function textValue(value,fallback="--"){
+
+  if(value===undefined || value===null || value===""){
+    return fallback;
+  }
+
+  return String(value);
+}
+
+
+async function fetchJSON(url){
+
+  const response=await fetch(
+    url+"?t="+Date.now(),
+    {cache:"no-store"}
+  );
+
+  if(!response.ok){
+    throw new Error(url);
+  }
+
+  return response.json();
+}
+
+
+function findMetric(data,names,fallback=0){
+
+  return numberValue(
+    recursiveFind(data,names),
+    fallback
+  );
+
+}
+
+
+function findText(data,names,fallback="--"){
+
+  return textValue(
+    recursiveFind(data,names),
+    fallback
+  );
+
+}
+
+
+function updateHealth(data){
+
+  const rawRisk=recursiveFind(
+    data,
+    [
+      "operational_risk",
+      "risk_operational",
+      "risk",
+      "risk_score",
+      "risco_operacional",
+      "risco"
+    ]
+  );
+
+
+  const healthElement=
+    document.getElementById("health");
+
+  const state=
+    document.getElementById("healthState");
+
+  const riskElement=
+    document.getElementById("risk");
+
+
+  if(rawRisk===undefined){
+
+    riskElement.textContent="--";
+    healthElement.textContent="--";
+
+    state.textContent=
+      "AGUARDANDO ÍNDICE DE RISCO";
+
+    state.style.color="#6f919e";
+
+    return;
+  }
+
+
+  let risk=numberValue(rawRisk,0);
+
+  let riskPercent=
+    risk<=1
+      ? risk*100
+      : risk;
+
+
+  riskPercent=
+    Math.max(
+      0,
+      Math.min(100,riskPercent)
+    );
+
+
+  const health=
+    100-riskPercent;
+
+
+  riskElement.textContent=
+    risk<=1
+      ? risk.toFixed(2)
+      : risk.toFixed(1)+"%";
+
+
+  healthElement.textContent=
+    health.toFixed(0);
+
+
+  if(health>=80){
+
+    state.textContent=
+      "SISTEMA SAUDÁVEL";
+
+    state.style.color=
+      "#4ce6ad";
+
+  }else if(health>=60){
+
+    state.textContent=
+      "ATENÇÃO OPERACIONAL";
+
+    state.style.color=
+      "#f2c45d";
+
+  }else{
+
+    state.textContent=
+      "RISCO ELEVADO";
+
+    state.style.color=
+      "#ff6677";
+
+  }
+
+}
+
+
+async function updateLive(){
+
+  try{
+
+    const data=
+      await fetchJSON(LIVE_URL);
+
+    const cpu=findMetric(
+      data,
+      [
+        "cpu_percent",
+        "cpu_usage",
+        "cpu",
+        "cpu_usage_percent"
+      ]
+    );
+
+    const ram=findMetric(
+      data,
+      [
+        "memory_percent",
+        "ram_percent",
+        "memory_usage",
+        "ram",
+        "mem_percent"
+      ]
+    );
+
+    const temperature=findMetric(
+      data,
+      [
+        "temperature_c",
+        "temperature",
+        "temp_c",
+        "cpu_temperature",
+        "temp"
+      ]
+    );
+
+    const disk=findMetric(
+      data,
+      [
+        "disk_percent",
+        "disk_usage",
+        "disk_used_percent",
+        "disk"
+      ]
+    );
+
+    const latency=findMetric(
+      data,
+      [
+        "latency_ms",
+        "latency",
+        "ping_ms",
+        "ping"
+      ]
+    );
+
+    const rx=findMetric(
+      data,
+      [
+        "rx_kbps",
+        "network_rx_kbps",
+        "rx",
+        "download_kbps"
+      ]
+    );
+
+    const tx=findMetric(
+      data,
+      [
+        "tx_kbps",
+        "network_tx_kbps",
+        "tx",
+        "upload_kbps"
+      ]
+    );
+
+    document.getElementById("cpu").textContent=
+      cpu.toFixed(1);
+
+    document.getElementById("ram").textContent=
+      ram.toFixed(1);
+
+    document.getElementById("temperature").textContent=
+      temperature.toFixed(1);
+
+    document.getElementById("disk").textContent=
+      disk.toFixed(1);
+
+    document.getElementById("latency").textContent=
+      latency.toFixed(1);
+
+    document.getElementById("network").textContent=
+      (rx+tx).toFixed(1);
+
+    document.getElementById("rx").textContent=
+      rx.toFixed(1)+" kbps";
+
+    document.getElementById("tx").textContent=
+      tx.toFixed(1)+" kbps";
+
+
+    const uptime=findText(
+      data,
+      [
+        "uptime_human",
+        "uptime_formatted",
+        "uptime"
+      ]
+    );
+
+    document.getElementById("uptime").textContent=
+      uptime;
+
+
+    const node=findText(
+      data,
+      [
+        "node_id",
+        "node",
+        "hostname",
+        "host"
+      ],
+      "EDGEBOX"
+    );
+
+    document.getElementById("nodeName").textContent=
+      "NODE "+node.toUpperCase();
+
+
+    updateHealth(data);
+
+
+    const now=
+      new Date().toLocaleTimeString();
+
+    document.getElementById("lastUpdate").textContent=
+      now;
+
+    document.getElementById("connection").textContent=
+      "EDGEBOX ONLINE";
+
+    document.getElementById("connection").classList.remove("offline");
+
+    document.getElementById("footerStatus").textContent=
+      "LIVE / "+now;
+
+
+  }catch(error){
+
+    document.getElementById("connection").textContent=
+      "SEM TELEMETRIA";
+
+    document.getElementById("connection").classList.add("offline");
+
+    document.getElementById("footerStatus").textContent=
+      "CONEXÃO COM TELEMETRIA INDISPONÍVEL";
+
+  }
+
+}
+
+
+function findArray(obj){
+
+  if(Array.isArray(obj)){
+    return obj;
+  }
+
+  if(obj && typeof obj==="object"){
+
+    const priorities=[
+      "history",
+      "samples",
+      "data",
+      "metrics",
+      "records"
+    ];
+
+    for(const key of priorities){
+
+      if(Array.isArray(obj[key])){
+        return obj[key];
+      }
+
+    }
+
+    for(const value of Object.values(obj)){
+
+      if(Array.isArray(value)){
+        return value;
+      }
+
+    }
+
+  }
+
+  return [];
+
+}
+
+
+async function updateHistory(){
+
+  try{
+
+    const json=
+      await fetchJSON(HISTORY_URL);
+
+    historyData=
+      findArray(json).slice(-60);
+
+    drawChart();
+
+  }catch(error){
+
+    historyData=[];
+
+    drawChart();
+
+  }
+
+}
+
+
+function historyMetric(item,names){
+
+  return findMetric(
+    item,
+    names,
+    NaN
+  );
+
+}
+
+
+function drawChart(){
+
+  const canvas=
+    document.getElementById(
+      "telemetryChart"
+    );
+
+  const rect=
+    canvas.getBoundingClientRect();
+
+  const dpr=
+    window.devicePixelRatio || 1;
+
+  canvas.width=
+    Math.max(
+      1,
+      Math.floor(
+        rect.width*dpr
+      )
+    );
+
+  canvas.height=
+    Math.max(
+      1,
+      Math.floor(
+        rect.height*dpr
+      )
+    );
+
+  const ctx=
+    canvas.getContext("2d");
+
+  ctx.setTransform(
+    dpr,0,0,dpr,0,0
+  );
+
+  const w=rect.width;
+  const h=rect.height;
+
+  ctx.clearRect(0,0,w,h);
+
+
+  const pad={
+    left:34,
+    right:12,
+    top:12,
+    bottom:24
+  };
+
+  const cw=
+    w-pad.left-pad.right;
+
+  const ch=
+    h-pad.top-pad.bottom;
+
+
+  ctx.font="9px Arial";
+
+  ctx.strokeStyle=
+    "rgba(100,190,210,.08)";
+
+  ctx.fillStyle=
+    "#496a78";
+
+  ctx.lineWidth=1;
+
+
+  for(let i=0;i<=4;i++){
+
+    const y=
+      pad.top+
+      ch*(i/4);
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      pad.left,
+      y
+    );
+
+    ctx.lineTo(
+      w-pad.right,
+      y
+    );
+
+    ctx.stroke();
+
+
+    const label=
+      Math.round(
+        100-
+        i*25
+      );
+
+    ctx.fillText(
+      label,
+      5,
+      y+3
+    );
+
+  }
+
+
+  if(!historyData.length){
+
+    ctx.fillStyle=
+      "#5c7e8c";
+
+    ctx.font=
+      "12px Arial";
+
+    ctx.fillText(
+      "Aguardando histórico...",
+      pad.left+20,
+      pad.top+40
+    );
+
+    return;
+  }
+
+
+  const cpu=
+    historyData.map(
+      x=>historyMetric(
+        x,
+        [
+          "cpu_percent",
+          "cpu_usage",
+          "cpu"
+        ]
+      )
+    );
+
+  const ram=
+    historyData.map(
+      x=>historyMetric(
+        x,
+        [
+          "memory_percent",
+          "ram_percent",
+          "ram"
+        ]
+      )
+    );
+
+  const temp=
+    historyData.map(
+      x=>historyMetric(
+        x,
+        [
+          "temperature_c",
+          "temperature",
+          "temp_c",
+          "temp"
+        ]
+      )
+    );
+
+
+  drawSeries(
+    ctx,
+    cpu,
+    "#27d6ef",
+    pad,
+    cw,
+    ch
+  );
+
+  drawSeries(
+    ctx,
+    ram,
+    "#4ce6ad",
+    pad,
+    cw,
+    ch
+  );
+
+  drawSeries(
+    ctx,
+    temp,
+    "#f2c45d",
+    pad,
+    cw,
+    ch
+  );
+
+}
+
+
+function drawSeries(
+  ctx,
+  values,
+  color,
+  pad,
+  cw,
+  ch
+){
+
+  const valid=
+    values.some(
+      Number.isFinite
+    );
+
+  if(!valid){
+    return;
+  }
+
+  ctx.beginPath();
+
+  ctx.lineWidth=2.2;
+
+  ctx.strokeStyle=color;
+
+  ctx.lineJoin="round";
+
+  ctx.lineCap="round";
+
+
+  let started=false;
+
+
+  values.forEach(
+    (value,index)=>{
+
+      if(!Number.isFinite(value)){
+        return;
+      }
+
+      const x=
+        pad.left+
+        (
+          index/
+          Math.max(
+            1,
+            values.length-1
+          )
+        )*cw;
+
+      const y=
+        pad.top+
+        (
+          1-
+          Math.max(
+            0,
+            Math.min(
+              100,
+              value
+            )
+          )/100
+        )*ch;
+
+
+      if(!started){
+
+        ctx.moveTo(x,y);
+
+        started=true;
+
+      }else{
+
+        ctx.lineTo(x,y);
+
+      }
+
+    }
+  );
+
+
+  ctx.stroke();
+
+}
+
+
+updateLive();
+updateHistory();
+
+setInterval(
+  updateLive,
+  5000
+);
+
+setInterval(
+  updateHistory,
+  10000
+);
+
+window.addEventListener(
+  "resize",
+  drawChart
+);
+
+</script>
+
 </body>
 </html>

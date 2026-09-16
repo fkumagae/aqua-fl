@@ -16,7 +16,7 @@ LATEST_PATH = EDGEBOX_DATA_DIR / "edgebox_latest.json"
 MODEL_PATH = EDGEBOX_DATA_DIR / "edgebox_model_update.json"
 GLOBAL_MODEL_PATH = EDGEBOX_DATA_DIR / "edgebox_global_model.json"
 STATE_PATH = EDGEBOX_DATA_DIR / "edgebox_state.json"
-INDEX_PATH = WEB_DIR / "index.html"
+INDEX_PATH = WEB_DIR / "legacy.html"
 LIVE_PATH = WEB_DIR / "edgebox_live.json"
 HISTORY_PATH = WEB_DIR / "edgebox_history.json"
 
