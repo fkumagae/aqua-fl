@@ -9,17 +9,28 @@ from .common import INPUT_SIZE, INPUT_WINDOW, OUTPUT_SIZE, run_model_cli, valida
 
 
 class LinearForecaster(nn.Module):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        input_window: int = INPUT_WINDOW,
+        input_size: int = INPUT_SIZE,
+        output_size: int = OUTPUT_SIZE,
+    ) -> None:
         super().__init__()
-        self.output = nn.Linear(INPUT_WINDOW * INPUT_SIZE, OUTPUT_SIZE)
+        self.input_window = input_window
+        self.input_size = input_size
+        self.output = nn.Linear(input_window * input_size, output_size)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        validate_model_input(inputs)
+        validate_model_input(inputs, self.input_window, self.input_size)
         return self.output(torch.flatten(inputs, start_dim=1))
 
 
-def build_model() -> LinearForecaster:
-    return LinearForecaster()
+def build_model(
+    input_window: int = INPUT_WINDOW,
+    input_size: int = INPUT_SIZE,
+    output_size: int = OUTPUT_SIZE,
+) -> LinearForecaster:
+    return LinearForecaster(input_window, input_size, output_size)
 
 
 if __name__ == "__main__":

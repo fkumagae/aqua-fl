@@ -6,6 +6,7 @@ import argparse
 import json
 import math
 import random
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -18,9 +19,8 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 
-DATASET_NAME = "forecast_w60_h60"
-INPUT_WINDOW = 60
-FORECAST_HORIZON = 60
+DATASET_NAME = "forecast_w60_h60"  # Default for calls without --dataset-dir.
+INPUT_WINDOW = 60  # Defaults for direct build_model() calls.
 INPUT_SIZE = 6
 OUTPUT_SIZE = 6
 FEATURES = [
@@ -45,6 +45,18 @@ class DatasetBundle:
     test_y: np.ndarray
     metadata: dict[str, Any]
 
+    @property
+    def input_window(self) -> int:
+        return self.train_x.shape[1]
+
+    @property
+    def input_size(self) -> int:
+        return self.train_x.shape[2]
+
+    @property
+    def output_size(self) -> int:
+        return self.train_y.shape[1]
+
 
 def project_root() -> Path:
     """Resolve the repository root without depending on the current directory."""
@@ -60,8 +72,9 @@ def default_dataset_dir() -> Path:
     return project_root() / "dados" / "edgebox" / "processed" / DATASET_NAME
 
 
-def default_output_dir(model_type: str) -> Path:
-    return project_root() / "dados" / "edgebox" / "models" / model_type / "w60_h60"
+def default_output_dir(model_type: str, dataset_dir: Path | None = None) -> Path:
+    scenario = (dataset_dir or default_dataset_dir()).name.removeprefix("forecast_")
+    return project_root() / "dados" / "edgebox" / "models" / model_type / scenario
 
 
 def set_seed(seed: int) -> None:
@@ -78,11 +91,15 @@ def cpu_device() -> torch.device:
     return torch.device("cpu")
 
 
-def validate_model_input(inputs: torch.Tensor) -> None:
-    expected = (INPUT_WINDOW, INPUT_SIZE)
+def validate_model_input(
+    inputs: torch.Tensor,
+    input_window: int = INPUT_WINDOW,
+    input_size: int = INPUT_SIZE,
+) -> None:
+    expected = (input_window, input_size)
     if inputs.ndim != 3 or tuple(inputs.shape[1:]) != expected:
         raise ValueError(
-            f"Expected input shape (batch, {INPUT_WINDOW}, {INPUT_SIZE}), "
+            f"Expected input shape (batch, {input_window}, {input_size}), "
             f"received {tuple(inputs.shape)}"
         )
 
@@ -90,7 +107,7 @@ def validate_model_input(inputs: torch.Tensor) -> None:
 def _read_metadata(dataset_dir: Path) -> dict[str, Any]:
     path = dataset_dir / "metadata.json"
     if not path.is_file():
-        raise FileNotFoundError(f"Dataset metadata not found: {path}")
+        return {}
     with path.open("r", encoding="utf-8") as source:
         metadata = json.load(source)
     if not isinstance(metadata, dict):
@@ -113,12 +130,8 @@ def _load_split(dataset_dir: Path, split: str) -> tuple[np.ndarray, np.ndarray]:
 
 
 def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None:
-    expected_x_tail = (INPUT_WINDOW, INPUT_SIZE)
-    if inputs.ndim != 3 or tuple(inputs.shape[1:]) != expected_x_tail:
-        raise ValueError(
-            f"{split}.npz X must have shape (N, {INPUT_WINDOW}, {INPUT_SIZE}); "
-            f"received {inputs.shape}"
-        )
+    if inputs.ndim != 3 or inputs.shape[1] <= 0 or inputs.shape[2] <= 0:
+        raise ValueError(f"{split}.npz X must have shape (N, window, features); received {inputs.shape}")
     if targets.ndim != 2 or targets.shape[1] != OUTPUT_SIZE:
         raise ValueError(
             f"{split}.npz y must have shape (N, {OUTPUT_SIZE}); received {targets.shape}"
@@ -131,20 +144,45 @@ def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None
         raise ValueError(f"{split}.npz contains no samples")
 
 
-def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle) -> None:
-    expected = {
-        "input_window": INPUT_WINDOW,
-        "forecast_horizon": FORECAST_HORIZON,
-        "forecast_type": "point",
-        "features": FEATURES,
-        "dtype": "float32",
-    }
-    for key, expected_value in expected.items():
-        if metadata.get(key) != expected_value:
-            raise ValueError(
-                f"metadata.json field {key!r} must be {expected_value!r}; "
-                f"received {metadata.get(key)!r}"
-            )
+def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle, dataset_dir: Path) -> None:
+    for split, inputs, targets in (
+        ("validation", bundle.validation_x, bundle.validation_y),
+        ("test", bundle.test_x, bundle.test_y),
+    ):
+        if inputs.shape[1:] != bundle.train_x.shape[1:] or targets.shape[1:] != bundle.train_y.shape[1:]:
+            raise ValueError(f"{split}.npz dimensions differ from train.npz")
+
+    window = metadata.get("input_window", bundle.input_window)
+    if type(window) is not int or window != bundle.input_window:
+        raise ValueError(f"metadata.json input_window must match X shape ({bundle.input_window})")
+
+    horizon = metadata.get("forecast_horizon")
+    if horizon is None:
+        match = re.search(r"(?:^|_)w(\d+)_h(\d+)(?:_|$)", dataset_dir.name)
+        if match and int(match.group(1)) != bundle.input_window:
+            raise ValueError("dataset directory window does not match X shape")
+        horizon = int(match.group(2)) if match else None
+    if type(horizon) is not int or horizon <= 0:
+        raise ValueError("forecast_horizon must be a positive integer in metadata.json or dataset directory name")
+
+    features = metadata.get("features", FEATURES if bundle.input_size == len(FEATURES) else None)
+    if not isinstance(features, list) or len(features) != bundle.input_size or not all(isinstance(name, str) and name for name in features):
+        raise ValueError(f"metadata.json features must contain {bundle.input_size} names")
+    output_features = metadata.get("target_features", FEATURES)
+    if not isinstance(output_features, list) or len(output_features) != bundle.output_size:
+        raise ValueError(f"metadata.json target_features must contain {bundle.output_size} names")
+    for key, expected_value in (("forecast_type", "point"), ("dtype", "float32")):
+        if key in metadata and metadata[key] != expected_value:
+            raise ValueError(f"metadata.json field {key!r} must be {expected_value!r}")
+
+    dataset_name = metadata.get("dataset") or metadata.get("dataset_name") or metadata.get("scenario") or dataset_dir.name
+    if not isinstance(dataset_name, str):
+        raise ValueError("metadata.json dataset name must be a string")
+    metadata["dataset"] = dataset_name
+    metadata["input_window"] = window
+    metadata["forecast_horizon"] = horizon
+    metadata["features"] = features
+    metadata["target_features"] = output_features
 
     counts = {
         "train_samples": bundle.train_x.shape[0],
@@ -175,7 +213,7 @@ def load_dataset(dataset_dir: Path | None = None) -> DatasetBundle:
         test_y=test_y,
         metadata=metadata,
     )
-    _validate_metadata(metadata, bundle)
+    _validate_metadata(metadata, bundle, resolved)
     return bundle
 
 
@@ -222,6 +260,7 @@ def calculate_metrics(
     loader: DataLoader,
     device: torch.device,
     per_feature: bool = False,
+    output_features: list[str] | None = None,
 ) -> dict[str, Any]:
     """Calculate sample-weighted regression metrics without retaining predictions."""
 
@@ -229,7 +268,7 @@ def calculate_metrics(
     squared_error = 0.0
     absolute_error = 0.0
     element_count = 0
-    feature_absolute_error = torch.zeros(OUTPUT_SIZE, dtype=torch.float64)
+    feature_absolute_error = torch.zeros(len(output_features or FEATURES), dtype=torch.float64)
     sample_count = 0
 
     with torch.inference_mode():
@@ -256,7 +295,7 @@ def calculate_metrics(
     if per_feature:
         result["mae_per_feature"] = {
             feature: float(value / sample_count)
-            for feature, value in zip(FEATURES, feature_absolute_error.tolist())
+            for feature, value in zip(output_features or FEATURES, feature_absolute_error.tolist())
         }
     return result
 
@@ -313,7 +352,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def run_experiment(
     model_type: str,
-    model_factory: Callable[[], nn.Module],
+    model_factory: Callable[..., nn.Module],
     *,
     hidden_size: int | None,
     num_layers: int | None,
@@ -330,7 +369,11 @@ def run_experiment(
     device = cpu_device()
     bundle = load_dataset(dataset_dir)
     loaders = create_data_loaders(bundle, batch_size=batch_size, seed=seed)
-    model = model_factory().to(device)
+    model = model_factory(
+        input_window=bundle.input_window,
+        input_size=bundle.input_size,
+        output_size=bundle.output_size,
+    ).to(device)
     parameter_count = count_parameters(model)
     history, training_seconds = train_model(
         model,
@@ -342,19 +385,26 @@ def run_experiment(
 
     train_metrics = calculate_metrics(model, loaders["train"], device)
     validation_metrics = calculate_metrics(model, loaders["validation"], device)
-    test_metrics = calculate_metrics(model, loaders["test"], device, per_feature=True)
+    test_metrics = calculate_metrics(
+        model,
+        loaders["test"],
+        device,
+        per_feature=True,
+        output_features=bundle.metadata["target_features"],
+    )
     trained_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
     model_metadata = {
         "model_type": model_type,
-        "dataset": DATASET_NAME,
-        "input_window": INPUT_WINDOW,
-        "forecast_horizon": FORECAST_HORIZON,
-        "input_size": INPUT_SIZE,
-        "output_size": OUTPUT_SIZE,
+        "dataset": bundle.metadata["dataset"],
+        "input_window": bundle.input_window,
+        "forecast_horizon": bundle.metadata["forecast_horizon"],
+        "input_size": bundle.input_size,
+        "output_size": bundle.output_size,
         "hidden_size": hidden_size,
         "num_layers": num_layers,
-        "features": FEATURES,
+        "features": bundle.metadata["features"],
+        "target_features": bundle.metadata["target_features"],
         "epochs": epochs,
         "batch_size": batch_size,
         "learning_rate": learning_rate,
@@ -369,7 +419,13 @@ def run_experiment(
     }
     metrics = {
         "model_type": model_type,
-        "dataset": DATASET_NAME,
+        "dataset": bundle.metadata["dataset"],
+        "input_window": bundle.input_window,
+        "forecast_horizon": bundle.metadata["forecast_horizon"],
+        "input_size": bundle.input_size,
+        "output_size": bundle.output_size,
+        "features": bundle.metadata["features"],
+        "target_features": bundle.metadata["target_features"],
         "train_samples": bundle.train_x.shape[0],
         "validation_samples": bundle.validation_x.shape[0],
         "test_samples": bundle.test_x.shape[0],
@@ -394,7 +450,7 @@ def run_experiment(
         "history": history,
     }
 
-    destination = (output_dir or default_output_dir(model_type)).resolve()
+    destination = (output_dir or default_output_dir(model_type, dataset_dir)).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), destination / "model.pt")
     write_json(destination / "model.json", model_metadata)
@@ -423,12 +479,14 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
     parser.add_argument("--batch-size", type=_positive_int, default=32)
     parser.add_argument("--learning-rate", type=_positive_float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--dataset-dir", type=Path, default=None)
+    parser.add_argument("--output-dir", type=Path, default=None)
     return parser.parse_args()
 
 
 def run_model_cli(
     model_type: str,
-    model_factory: Callable[[], nn.Module],
+    model_factory: Callable[..., nn.Module],
     *,
     hidden_size: int | None,
     num_layers: int | None,
@@ -443,4 +501,6 @@ def run_model_cli(
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         seed=args.seed,
+        dataset_dir=args.dataset_dir,
+        output_dir=args.output_dir,
     )

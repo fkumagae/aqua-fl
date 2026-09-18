@@ -9,24 +9,35 @@ from .common import INPUT_SIZE, INPUT_WINDOW, OUTPUT_SIZE, run_model_cli, valida
 
 
 class MLPForecaster(nn.Module):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        input_window: int = INPUT_WINDOW,
+        input_size: int = INPUT_SIZE,
+        output_size: int = OUTPUT_SIZE,
+    ) -> None:
         super().__init__()
+        self.input_window = input_window
+        self.input_size = input_size
         self.network = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(INPUT_WINDOW * INPUT_SIZE, 64),
+            nn.Linear(input_window * input_size, 64),
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
-            nn.Linear(32, OUTPUT_SIZE),
+            nn.Linear(32, output_size),
         )
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        validate_model_input(inputs)
+        validate_model_input(inputs, self.input_window, self.input_size)
         return self.network(inputs)
 
 
-def build_model() -> MLPForecaster:
-    return MLPForecaster()
+def build_model(
+    input_window: int = INPUT_WINDOW,
+    input_size: int = INPUT_SIZE,
+    output_size: int = OUTPUT_SIZE,
+) -> MLPForecaster:
+    return MLPForecaster(input_window, input_size, output_size)
 
 
 if __name__ == "__main__":
