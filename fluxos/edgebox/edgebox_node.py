@@ -1,4 +1,5 @@
 import json
+import math
 import time
 import shutil
 import socket
@@ -384,6 +385,73 @@ def read_history(days, max_points):
         result.append(point)
 
     return result[-max_points:]
+
+
+def read_dashboard_history(path=None, now=None):
+    """Build the technical dashboard's hour, day and week series in one pass."""
+    source_path = path or DATASET_PATH
+    current = now or datetime.now().astimezone()
+    current_epoch = current.timestamp()
+    cutoffs = {
+        "samples": current_epoch - 3600,
+        "today": current_epoch - 86400,
+        "week": current_epoch - 7 * 86400,
+    }
+    recent = []
+    buckets = {"today": {}, "week": {}}
+    features = ("cpu_percent", "ram_percent", "temperature_c", "inferred_risk")
+
+    if source_path.exists():
+        with source_path.open("r", encoding="utf-8") as source:
+            for line in source:
+                try:
+                    sample = json.loads(line)
+                    timestamp = datetime.fromisoformat(sample["timestamp"].replace("Z", "+00:00"))
+                    timestamp = timestamp.astimezone()
+                    epoch = timestamp.timestamp()
+                except (json.JSONDecodeError, AttributeError, KeyError, TypeError, ValueError):
+                    continue
+                if epoch < cutoffs["week"] or epoch > current_epoch:
+                    continue
+
+                values = {}
+                for feature in features:
+                    try:
+                        value = float(sample[feature])
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if math.isfinite(value):
+                        values[feature] = value
+
+                if epoch >= cutoffs["samples"]:
+                    recent.append((epoch, {
+                        "timestamp": timestamp.isoformat(timespec="seconds"),
+                        **values,
+                    }))
+
+                for period, seconds in (("today", 300), ("week", 1800)):
+                    if epoch < cutoffs[period]:
+                        continue
+                    bucket_start = int(epoch // seconds) * seconds
+                    bucket = buckets[period].setdefault(bucket_start, {})
+                    for feature, value in values.items():
+                        total, count = bucket.get(feature, (0.0, 0))
+                        bucket[feature] = (total + value, count + 1)
+
+    recent.sort(key=lambda item: item[0])
+    if len(recent) > 600:
+        recent = [recent[round(index * (len(recent) - 1) / 599)] for index in range(600)]
+
+    result = {"updated_at": current.isoformat(timespec="seconds"),
+              "samples": [point for _, point in recent]}
+    for period in ("today", "week"):
+        result[period] = []
+        for bucket_start, values in sorted(buckets[period].items()):
+            point = {"timestamp": datetime.fromtimestamp(bucket_start).astimezone().isoformat(timespec="seconds")}
+            for feature, (total, count) in values.items():
+                point[feature] = round(total / count, 4)
+            result[period].append(point)
+    return result
 
 
 def train_local_model(samples):
@@ -1127,10 +1195,12 @@ def main():
     LIVE_PATH.write_text(payload, encoding="utf-8")
 
     try:
-        samples = read_recent_samples(60)
-        (WEB_DIR / "edgebox_history.json").write_text(json.dumps(samples, ensure_ascii=False), encoding="utf-8")
-    except Exception as e:
-        pass
+        history = read_dashboard_history()
+        temporary_path = HISTORY_PATH.with_suffix(".json.tmp")
+        temporary_path.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
+        temporary_path.replace(HISTORY_PATH)
+    except OSError as error:
+        print(f"Falha ao atualizar historico do dashboard: {error}")
 
     print(f"[{metrics['timestamp']}] EdgeBox atualizado (fast) | risco={inferred_risk:.2f} | status={metrics['status']}")
 
