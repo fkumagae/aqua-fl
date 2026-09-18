@@ -18,8 +18,9 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 
+DATASET_NAME = "forecast_w60_h60"
 INPUT_WINDOW = 60
-DEFAULT_FORECAST_HORIZON = 60
+FORECAST_HORIZON = 60
 INPUT_SIZE = 6
 OUTPUT_SIZE = 6
 FEATURES = [
@@ -55,16 +56,12 @@ def project_root() -> Path:
     raise RuntimeError(f"Could not resolve the AquaFL project root from {source}")
 
 
-def dataset_name(horizon: int) -> str:
-    return f"forecast_w{INPUT_WINDOW}_h{horizon}"
+def default_dataset_dir() -> Path:
+    return project_root() / "dados" / "edgebox" / "processed" / DATASET_NAME
 
 
-def default_dataset_dir(horizon: int = DEFAULT_FORECAST_HORIZON) -> Path:
-    return project_root() / "dados" / "edgebox" / "processed" / dataset_name(horizon)
-
-
-def default_output_dir(model_type: str, horizon: int = DEFAULT_FORECAST_HORIZON) -> Path:
-    return project_root() / "dados" / "edgebox" / "models" / model_type / f"w{INPUT_WINDOW}_h{horizon}"
+def default_output_dir(model_type: str) -> Path:
+    return project_root() / "dados" / "edgebox" / "models" / model_type / "w60_h60"
 
 
 def set_seed(seed: int) -> None:
@@ -134,10 +131,10 @@ def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None
         raise ValueError(f"{split}.npz contains no samples")
 
 
-def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle, horizon: int) -> None:
+def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle) -> None:
     expected = {
         "input_window": INPUT_WINDOW,
-        "forecast_horizon": horizon,
+        "forecast_horizon": FORECAST_HORIZON,
         "forecast_type": "point",
         "features": FEATURES,
         "dtype": "float32",
@@ -161,15 +158,10 @@ def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle, horizon:
             )
 
 
-def load_dataset(
-    dataset_dir: Path | None = None,
-    horizon: int = DEFAULT_FORECAST_HORIZON,
-) -> DatasetBundle:
+def load_dataset(dataset_dir: Path | None = None) -> DatasetBundle:
     """Load and validate all splits exactly once."""
 
-    if horizon <= 0:
-        raise ValueError("forecast horizon must be greater than zero")
-    resolved = (dataset_dir or default_dataset_dir(horizon)).resolve()
+    resolved = (dataset_dir or default_dataset_dir()).resolve()
     metadata = _read_metadata(resolved)
     train_x, train_y = _load_split(resolved, "train")
     validation_x, validation_y = _load_split(resolved, "validation")
@@ -183,7 +175,7 @@ def load_dataset(
         test_y=test_y,
         metadata=metadata,
     )
-    _validate_metadata(metadata, bundle, horizon)
+    _validate_metadata(metadata, bundle)
     return bundle
 
 
@@ -275,8 +267,6 @@ def train_model(
     epochs: int,
     learning_rate: float,
     device: torch.device,
-    verbose: bool = False,
-    quiet: bool = False,
 ) -> tuple[list[dict[str, float]], float]:
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -287,7 +277,7 @@ def train_model(
         model.train()
         loss_sum = 0.0
         sample_count = 0
-        for batch_index, (inputs, targets) in enumerate(loaders["train"], start=1):
+        for inputs, targets in loaders["train"]:
             inputs = inputs.to(device=device, dtype=torch.float32)
             targets = targets.to(device=device, dtype=torch.float32)
             optimizer.zero_grad(set_to_none=True)
@@ -297,12 +287,6 @@ def train_model(
             optimizer.step()
             loss_sum += loss.item() * inputs.shape[0]
             sample_count += inputs.shape[0]
-            if verbose:
-                print(
-                    f"epoch={epoch}/{epochs} batch={batch_index}/{len(loaders['train'])} "
-                    f"batch_mse={loss.item():.6f}",
-                    flush=True,
-                )
 
         validation = calculate_metrics(model, loaders["validation"], device)
         epoch_metrics = {
@@ -311,12 +295,11 @@ def train_model(
             "validation_mse": validation["mse"],
         }
         history.append(epoch_metrics)
-        if not quiet:
-            print(
-                f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f} "
-                f"validation_mse={epoch_metrics['validation_mse']:.6f}",
-                flush=True,
-            )
+        print(
+            f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f} "
+            f"validation_mse={epoch_metrics['validation_mse']:.6f}",
+            flush=True,
+        )
 
     return history, time.perf_counter() - started
 
@@ -340,15 +323,12 @@ def run_experiment(
     seed: int,
     dataset_dir: Path | None = None,
     output_dir: Path | None = None,
-    horizon: int = DEFAULT_FORECAST_HORIZON,
-    verbose: bool = False,
-    quiet: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Train, evaluate and serialize one forecasting model."""
 
     set_seed(seed)
     device = cpu_device()
-    bundle = load_dataset(dataset_dir, horizon=horizon)
+    bundle = load_dataset(dataset_dir)
     loaders = create_data_loaders(bundle, batch_size=batch_size, seed=seed)
     model = model_factory().to(device)
     parameter_count = count_parameters(model)
@@ -358,8 +338,6 @@ def run_experiment(
         epochs=epochs,
         learning_rate=learning_rate,
         device=device,
-        verbose=verbose,
-        quiet=quiet,
     )
 
     train_metrics = calculate_metrics(model, loaders["train"], device)
@@ -369,9 +347,9 @@ def run_experiment(
 
     model_metadata = {
         "model_type": model_type,
-        "dataset": dataset_name(horizon),
+        "dataset": DATASET_NAME,
         "input_window": INPUT_WINDOW,
-        "forecast_horizon": horizon,
+        "forecast_horizon": FORECAST_HORIZON,
         "input_size": INPUT_SIZE,
         "output_size": OUTPUT_SIZE,
         "hidden_size": hidden_size,
@@ -381,7 +359,6 @@ def run_experiment(
         "batch_size": batch_size,
         "learning_rate": learning_rate,
         "seed": seed,
-        "logging": "verbose" if verbose else "quiet" if quiet else "per_epoch",
         "optimizer": "Adam",
         "loss": "MSELoss",
         "parameter_count": parameter_count,
@@ -392,7 +369,7 @@ def run_experiment(
     }
     metrics = {
         "model_type": model_type,
-        "dataset": dataset_name(horizon),
+        "dataset": DATASET_NAME,
         "train_samples": bundle.train_x.shape[0],
         "validation_samples": bundle.validation_x.shape[0],
         "test_samples": bundle.test_x.shape[0],
@@ -417,7 +394,7 @@ def run_experiment(
         "history": history,
     }
 
-    destination = (output_dir or default_output_dir(model_type, horizon)).resolve()
+    destination = (output_dir or default_output_dir(model_type)).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), destination / "model.pt")
     write_json(destination / "model.json", model_metadata)
@@ -445,36 +422,7 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
     parser.add_argument("--epochs", type=_positive_int, default=25)
     parser.add_argument("--batch-size", type=_positive_int, default=32)
     parser.add_argument("--learning-rate", type=_positive_float, default=0.001)
-    parser.add_argument(
-        "--horizon",
-        type=_positive_int,
-        default=DEFAULT_FORECAST_HORIZON,
-        help="Passos a frente para prever; a janela de entrada permanece em 60 amostras.",
-    )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument(
-        "--dataset-dir",
-        type=Path,
-        default=None,
-        help="Diretorio do dataset preparado; por padrao usa dados/edgebox/processed no projeto.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=None,
-        help="Diretorio para pesos e metricas; por padrao usa dados/edgebox/models no projeto.",
-    )
-    logging = parser.add_mutually_exclusive_group()
-    logging.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Mostra a perda de cada batch alem do resumo por epoca.",
-    )
-    logging.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suprime o progresso por epoca; util para benchmarks automatizados.",
-    )
     return parser.parse_args()
 
 
@@ -495,9 +443,4 @@ def run_model_cli(
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
         seed=args.seed,
-        horizon=args.horizon,
-        dataset_dir=args.dataset_dir,
-        output_dir=args.output_dir,
-        verbose=args.verbose,
-        quiet=args.quiet,
     )

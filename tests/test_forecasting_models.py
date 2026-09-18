@@ -6,20 +6,11 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 import numpy as np
 import torch
 
-from fluxos.edgebox.models.common import (
-    FEATURES,
-    count_parameters,
-    default_dataset_dir,
-    default_output_dir,
-    load_dataset,
-    parse_training_args,
-    run_experiment,
-)
+from fluxos.edgebox.models.common import FEATURES, count_parameters, run_experiment
 from fluxos.edgebox.models.gru import build_model as build_gru
 from fluxos.edgebox.models.linear import build_model as build_linear
 from fluxos.edgebox.models.lstm import build_model as build_lstm
@@ -37,19 +28,6 @@ MODEL_CASES = {
 
 
 class ForecastModelTests(unittest.TestCase):
-    def test_cli_accepts_horizon_and_explicit_paths(self) -> None:
-        arguments = [
-            "gru",
-            "--horizon", "30",
-            "--dataset-dir", "/tmp/forecast_w60_h30",
-            "--output-dir", "/tmp/gru/w60_h30",
-        ]
-        with patch("sys.argv", arguments):
-            parsed = parse_training_args("gru")
-        self.assertEqual(parsed.horizon, 30)
-        self.assertEqual(parsed.dataset_dir, Path("/tmp/forecast_w60_h30"))
-        self.assertEqual(parsed.output_dir, Path("/tmp/gru/w60_h30"))
-
     def test_forward_backward_state_dict_parameters_and_cpu(self) -> None:
         inputs = torch.randn(8, 60, 6, device="cpu")
         targets = torch.randn(8, 6, device="cpu")
@@ -78,60 +56,51 @@ class ForecastModelTests(unittest.TestCase):
     def test_one_epoch_smoke_training_for_every_model(self) -> None:
         with tempfile.TemporaryDirectory(prefix="aquafl_training_test_") as temp_name:
             temp_dir = Path(temp_name)
+            dataset_dir = temp_dir / "dataset"
+            dataset_dir.mkdir()
             generator = np.random.default_rng(42)
             counts = {"train": 12, "validation": 8, "test": 8}
-            for horizon in (60, 30):
-                dataset_dir = temp_dir / f"forecast_w60_h{horizon}"
-                dataset_dir.mkdir()
-                for split, samples in counts.items():
-                    inputs = generator.normal(size=(samples, 60, 6)).astype(np.float32)
-                    targets = generator.normal(size=(samples, 6)).astype(np.float32)
-                    np.savez_compressed(dataset_dir / f"{split}.npz", X=inputs, y=targets)
+            for split, samples in counts.items():
+                inputs = generator.normal(size=(samples, 60, 6)).astype(np.float32)
+                targets = generator.normal(size=(samples, 6)).astype(np.float32)
+                np.savez_compressed(dataset_dir / f"{split}.npz", X=inputs, y=targets)
 
-                metadata = {
-                    "features": FEATURES,
-                    "sampling_seconds": 10,
-                    "input_window": 60,
-                    "forecast_horizon": horizon,
-                    "forecast_type": "point",
-                    "dtype": "float32",
-                    "train_samples": counts["train"],
-                    "validation_samples": counts["validation"],
-                    "test_samples": counts["test"],
-                }
-                (dataset_dir / "metadata.json").write_text(
-                    json.dumps(metadata), encoding="utf-8"
-                )
-                self.assertEqual(default_dataset_dir(horizon).name, dataset_dir.name)
-                with self.assertRaisesRegex(ValueError, "forecast_horizon"):
-                    load_dataset(dataset_dir, horizon=31)
+            metadata = {
+                "features": FEATURES,
+                "sampling_seconds": 10,
+                "input_window": 60,
+                "forecast_horizon": 60,
+                "forecast_type": "point",
+                "dtype": "float32",
+                "train_samples": counts["train"],
+                "validation_samples": counts["validation"],
+                "test_samples": counts["test"],
+            }
+            (dataset_dir / "metadata.json").write_text(
+                json.dumps(metadata), encoding="utf-8"
+            )
 
-                for model_name, (factory, expected_parameters, hidden_size, num_layers) in MODEL_CASES.items():
-                    with self.subTest(model=model_name, horizon=horizon):
-                        output_dir = temp_dir / "outputs" / model_name / f"w60_h{horizon}"
-                        self.assertEqual(default_output_dir(model_name, horizon).name, output_dir.name)
-                        model_metadata, metrics = run_experiment(
-                            model_name,
-                            factory,
-                            hidden_size=hidden_size,
-                            num_layers=num_layers,
-                            epochs=1,
-                            batch_size=4,
-                            learning_rate=0.001,
-                            seed=42,
-                            dataset_dir=dataset_dir,
-                            output_dir=output_dir,
-                            horizon=horizon,
-                        )
-                        self.assertEqual(model_metadata["device"], "cpu")
-                        self.assertEqual(model_metadata["dataset"], dataset_dir.name)
-                        self.assertEqual(model_metadata["forecast_horizon"], horizon)
-                        self.assertEqual(metrics["dataset"], dataset_dir.name)
-                        self.assertEqual(model_metadata["parameter_count"], expected_parameters)
-                        self.assertEqual(set(metrics["test_mae_per_feature"]), set(FEATURES))
-                        self.assertTrue((output_dir / "model.pt").is_file())
-                        self.assertTrue((output_dir / "model.json").is_file())
-                        self.assertTrue((output_dir / "metrics.json").is_file())
+            for model_name, (factory, expected_parameters, hidden_size, num_layers) in MODEL_CASES.items():
+                with self.subTest(model=model_name):
+                    output_dir = temp_dir / "outputs" / model_name
+                    model_metadata, metrics = run_experiment(
+                        model_name,
+                        factory,
+                        hidden_size=hidden_size,
+                        num_layers=num_layers,
+                        epochs=1,
+                        batch_size=4,
+                        learning_rate=0.001,
+                        seed=42,
+                        dataset_dir=dataset_dir,
+                        output_dir=output_dir,
+                    )
+                    self.assertEqual(model_metadata["device"], "cpu")
+                    self.assertEqual(model_metadata["parameter_count"], expected_parameters)
+                    self.assertEqual(set(metrics["test_mae_per_feature"]), set(FEATURES))
+                    self.assertTrue((output_dir / "model.pt").is_file())
+                    self.assertTrue((output_dir / "model.json").is_file())
+                    self.assertTrue((output_dir / "metrics.json").is_file())
 
 
 if __name__ == "__main__":

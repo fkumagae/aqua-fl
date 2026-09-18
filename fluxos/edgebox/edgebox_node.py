@@ -1116,24 +1116,23 @@ def save_dashboard(metrics, samples, weights, inferred_risk):
 def main():
     metrics = collect_metrics()
 
-    samples = read_recent_samples(300)
-
-    weights = train_local_model(samples)
-
-    inferred_risk = infer_with_model(weights, metrics)
+    inferred_risk = heuristic_risk(metrics)
     metrics["inferred_risk"] = round(inferred_risk, 4)
     metrics["status"] = status_from_risk(inferred_risk)
 
     append_dataset(metrics)
 
-    LATEST_PATH.write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
+    payload = json.dumps(metrics, indent=2, ensure_ascii=False)
+    LATEST_PATH.write_text(payload, encoding="utf-8")
+    LIVE_PATH.write_text(payload, encoding="utf-8")
 
-    save_model_files(weights, len(samples))
+    try:
+        samples = read_recent_samples(60)
+        (WEB_DIR / "edgebox_history.json").write_text(json.dumps(samples, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        pass
 
-    samples = read_recent_samples(300)
-    save_dashboard(metrics, samples, weights, inferred_risk)
-
-    print(f"[{metrics['timestamp']}] EdgeBox atualizado | risco={inferred_risk:.2f} | status={metrics['status']}")
+    print(f"[{metrics['timestamp']}] EdgeBox atualizado (fast) | risco={inferred_risk:.2f} | status={metrics['status']}")
 
 
 if __name__ == "__main__":
