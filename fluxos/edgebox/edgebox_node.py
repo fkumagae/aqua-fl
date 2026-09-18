@@ -1,16 +1,17 @@
 import json
 import math
+import sqlite3
 import time
 import shutil
 import socket
 import subprocess
 import re
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import deque
 from glob import glob
 
-from config import EDGEBOX_DATA_DIR, WEB_DIR
+from config import DATABASE_DIR, EDGEBOX_DATA_DIR, WEB_DIR
 
 DATASET_PATH = EDGEBOX_DATA_DIR / "edgebox_metrics.jsonl"
 LATEST_PATH = EDGEBOX_DATA_DIR / "edgebox_latest.json"
@@ -387,10 +388,34 @@ def read_history(days, max_points):
     return result[-max_points:]
 
 
-def read_dashboard_history(path=None, now=None):
+def read_dashboard_history(path=None, now=None, database_path=None, latest_sample=None):
     """Build the technical dashboard's hour, day and week series in one pass."""
-    source_path = path or DATASET_PATH
     current = now or datetime.now().astimezone()
+    if path is None:
+        database = database_path or DATABASE_DIR / "edgebox.db"
+        if database.is_file():
+            result = _read_dashboard_history_from_db(database, current)
+            if latest_sample:
+                try:
+                    timestamp = datetime.fromisoformat(latest_sample["timestamp"].replace("Z", "+00:00"))
+                    timestamp = timestamp.astimezone()
+                    last = result["samples"][-1]["timestamp"] if result["samples"] else None
+                    if (current.timestamp() - 3600 <= timestamp.timestamp() <= current.timestamp()
+                            and (last is None or timestamp > datetime.fromisoformat(last))):
+                        point = {"timestamp": timestamp.isoformat(timespec="seconds")}
+                        for feature in ("cpu_percent", "ram_percent", "temperature_c", "inferred_risk"):
+                            try:
+                                value = float(latest_sample[feature])
+                            except (KeyError, TypeError, ValueError):
+                                continue
+                            if math.isfinite(value):
+                                point[feature] = value
+                        result["samples"].append(point)
+                except (AttributeError, KeyError, TypeError, ValueError):
+                    pass
+            return result
+
+    source_path = path or DATASET_PATH
     current_epoch = current.timestamp()
     cutoffs = {
         "samples": current_epoch - 3600,
@@ -451,6 +476,56 @@ def read_dashboard_history(path=None, now=None):
             for feature, (total, count) in values.items():
                 point[feature] = round(total / count, 4)
             result[period].append(point)
+    return result
+
+
+def _read_dashboard_history_from_db(database_path, current):
+    """Use the indexed timestamp column instead of scanning the full JSONL."""
+    result = {"updated_at": current.isoformat(timespec="seconds"), "samples": [], "today": [], "week": []}
+    database_uri = database_path.resolve().as_uri() + "?mode=ro"
+    connection = sqlite3.connect(database_uri, uri=True, timeout=2)
+    try:
+        cutoff = datetime.fromtimestamp(current.timestamp() - 3600).isoformat(timespec="seconds")
+        rows = connection.execute(
+            "SELECT timestamp, cpu_percent, ram_percent, temperature_c, inferred_risk "
+            "FROM metrics WHERE timestamp >= ? ORDER BY timestamp", (cutoff,)
+        )
+        for stamp, cpu, ram, temperature, risk in rows:
+            timestamp = datetime.fromisoformat(stamp).astimezone()
+            if timestamp > current:
+                continue
+            point = {"timestamp": timestamp.isoformat(timespec="seconds")}
+            for feature, value in zip(
+                ("cpu_percent", "ram_percent", "temperature_c", "inferred_risk"),
+                (cpu, ram, temperature, risk),
+            ):
+                if value is not None and math.isfinite(value):
+                    point[feature] = value
+            result["samples"].append(point)
+
+        for period, seconds, duration in (("today", 300, 86400), ("week", 1800, 7 * 86400)):
+            cutoff = datetime.fromtimestamp(current.timestamp() - duration).isoformat(timespec="seconds")
+            rows = connection.execute(
+                "SELECT CAST(strftime('%s', timestamp) AS INTEGER) / ? AS bucket, "
+                "AVG(cpu_percent), AVG(ram_percent), AVG(temperature_c), AVG(inferred_risk) "
+                "FROM metrics WHERE timestamp >= ? GROUP BY bucket ORDER BY bucket",
+                (seconds, cutoff),
+            )
+            for bucket, cpu, ram, temperature, risk in rows:
+                if bucket is None:
+                    continue
+                # SQLite interprets the local wall-clock timestamp as UTC here.
+                wall_time = datetime.fromtimestamp(bucket * seconds, timezone.utc).replace(tzinfo=None)
+                point = {"timestamp": wall_time.astimezone().isoformat(timespec="seconds")}
+                for feature, value in zip(
+                    ("cpu_percent", "ram_percent", "temperature_c", "inferred_risk"),
+                    (cpu, ram, temperature, risk),
+                ):
+                    if value is not None and math.isfinite(value):
+                        point[feature] = round(value, 4)
+                result[period].append(point)
+    finally:
+        connection.close()
     return result
 
 
@@ -1195,11 +1270,11 @@ def main():
     LIVE_PATH.write_text(payload, encoding="utf-8")
 
     try:
-        history = read_dashboard_history()
+        history = read_dashboard_history(latest_sample=metrics)
         temporary_path = HISTORY_PATH.with_suffix(".json.tmp")
         temporary_path.write_text(json.dumps(history, ensure_ascii=False), encoding="utf-8")
         temporary_path.replace(HISTORY_PATH)
-    except OSError as error:
+    except (OSError, sqlite3.Error) as error:
         print(f"Falha ao atualizar historico do dashboard: {error}")
 
     print(f"[{metrics['timestamp']}] EdgeBox atualizado (fast) | risco={inferred_risk:.2f} | status={metrics['status']}")
