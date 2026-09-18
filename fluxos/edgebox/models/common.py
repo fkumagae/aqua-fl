@@ -115,7 +115,7 @@ def _read_metadata(dataset_dir: Path) -> dict[str, Any]:
     return metadata
 
 
-def _load_split(dataset_dir: Path, split: str) -> tuple[np.ndarray, np.ndarray]:
+def _load_split(dataset_dir: Path, split: str, *, allow_empty: bool = False) -> tuple[np.ndarray, np.ndarray]:
     path = dataset_dir / f"{split}.npz"
     if not path.is_file():
         raise FileNotFoundError(f"Dataset split not found: {path}")
@@ -125,11 +125,11 @@ def _load_split(dataset_dir: Path, split: str) -> tuple[np.ndarray, np.ndarray]:
             raise ValueError(f"{path} is missing arrays: {sorted(missing)}")
         inputs = np.asarray(archive["X"], dtype=np.float32)
         targets = np.asarray(archive["y"], dtype=np.float32)
-    _validate_split(split, inputs, targets)
+    _validate_split(split, inputs, targets, allow_empty=allow_empty)
     return inputs, targets
 
 
-def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None:
+def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray, *, allow_empty: bool = False) -> None:
     if inputs.ndim != 3 or inputs.shape[1] <= 0 or inputs.shape[2] <= 0:
         raise ValueError(f"{split}.npz X must have shape (N, window, features); received {inputs.shape}")
     if targets.ndim != 2 or targets.shape[1] != OUTPUT_SIZE:
@@ -140,7 +140,7 @@ def _validate_split(split: str, inputs: np.ndarray, targets: np.ndarray) -> None
         raise ValueError(
             f"{split}.npz has different sample counts: X={inputs.shape[0]}, y={targets.shape[0]}"
         )
-    if inputs.shape[0] == 0:
+    if inputs.shape[0] == 0 and not allow_empty:
         raise ValueError(f"{split}.npz contains no samples")
 
 
@@ -196,14 +196,14 @@ def _validate_metadata(metadata: dict[str, Any], bundle: DatasetBundle, dataset_
             )
 
 
-def load_dataset(dataset_dir: Path | None = None) -> DatasetBundle:
+def load_dataset(dataset_dir: Path | None = None, *, train_only: bool = False) -> DatasetBundle:
     """Load and validate all splits exactly once."""
 
     resolved = (dataset_dir or default_dataset_dir()).resolve()
     metadata = _read_metadata(resolved)
     train_x, train_y = _load_split(resolved, "train")
-    validation_x, validation_y = _load_split(resolved, "validation")
-    test_x, test_y = _load_split(resolved, "test")
+    validation_x, validation_y = _load_split(resolved, "validation", allow_empty=train_only)
+    test_x, test_y = _load_split(resolved, "test", allow_empty=train_only)
     bundle = DatasetBundle(
         train_x=train_x,
         train_y=train_y,
@@ -227,17 +227,23 @@ def create_data_loaders(
     bundle: DatasetBundle,
     batch_size: int,
     seed: int,
+    *,
+    train_only: bool = False,
 ) -> dict[str, DataLoader]:
     generator = torch.Generator(device="cpu")
     generator.manual_seed(seed)
     common = {"batch_size": batch_size, "num_workers": 0, "pin_memory": False}
-    return {
+    loaders = {
         "train": DataLoader(
             numpy_to_torch(bundle.train_x, bundle.train_y),
             shuffle=True,
             generator=generator,
             **common,
         ),
+    }
+    if train_only:
+        return loaders
+    loaders.update({
         "validation": DataLoader(
             numpy_to_torch(bundle.validation_x, bundle.validation_y),
             shuffle=False,
@@ -248,7 +254,8 @@ def create_data_loaders(
             shuffle=False,
             **common,
         ),
-    }
+    })
+    return loaders
 
 
 def count_parameters(model: nn.Module) -> int:
@@ -306,10 +313,12 @@ def train_model(
     epochs: int,
     learning_rate: float,
     device: torch.device,
-) -> tuple[list[dict[str, float]], float]:
+    *,
+    train_only: bool = False,
+) -> tuple[list[dict[str, float | int]], float]:
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    history: list[dict[str, float]] = []
+    history: list[dict[str, float | int]] = []
     started = time.perf_counter()
 
     for epoch in range(1, epochs + 1):
@@ -327,18 +336,18 @@ def train_model(
             loss_sum += loss.item() * inputs.shape[0]
             sample_count += inputs.shape[0]
 
-        validation = calculate_metrics(model, loaders["validation"], device)
         epoch_metrics = {
             "epoch": epoch,
             "train_loss": loss_sum / sample_count,
-            "validation_mse": validation["mse"],
         }
+        if not train_only:
+            validation = calculate_metrics(model, loaders["validation"], device)
+            epoch_metrics["validation_mse"] = validation["mse"]
         history.append(epoch_metrics)
-        print(
-            f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f} "
-            f"validation_mse={epoch_metrics['validation_mse']:.6f}",
-            flush=True,
-        )
+        line = f"epoch={epoch}/{epochs} train_mse={epoch_metrics['train_loss']:.6f}"
+        if not train_only:
+            line += f" validation_mse={epoch_metrics['validation_mse']:.6f}"
+        print(line, flush=True)
 
     return history, time.perf_counter() - started
 
@@ -362,13 +371,14 @@ def run_experiment(
     seed: int,
     dataset_dir: Path | None = None,
     output_dir: Path | None = None,
+    train_only: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Train, evaluate and serialize one forecasting model."""
+    """Train and serialize one model, optionally skipping all evaluation."""
 
     set_seed(seed)
     device = cpu_device()
-    bundle = load_dataset(dataset_dir)
-    loaders = create_data_loaders(bundle, batch_size=batch_size, seed=seed)
+    bundle = load_dataset(dataset_dir, train_only=train_only)
+    loaders = create_data_loaders(bundle, batch_size=batch_size, seed=seed, train_only=train_only)
     model = model_factory(
         input_window=bundle.input_window,
         input_size=bundle.input_size,
@@ -381,15 +391,13 @@ def run_experiment(
         epochs=epochs,
         learning_rate=learning_rate,
         device=device,
+        train_only=train_only,
     )
 
-    train_metrics = calculate_metrics(model, loaders["train"], device)
-    validation_metrics = calculate_metrics(model, loaders["validation"], device)
-    test_metrics = calculate_metrics(
-        model,
-        loaders["test"],
-        device,
-        per_feature=True,
+    train_metrics = None if train_only else calculate_metrics(model, loaders["train"], device)
+    validation_metrics = None if train_only else calculate_metrics(model, loaders["validation"], device)
+    test_metrics = None if train_only else calculate_metrics(
+        model, loaders["test"], device, per_feature=True,
         output_features=bundle.metadata["target_features"],
     )
     trained_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -415,6 +423,7 @@ def run_experiment(
         "torch_version": torch.__version__,
         "numpy_version": np.__version__,
         "device": str(device),
+        "train_only": train_only,
         "trained_at": trained_at,
     }
     metrics = {
@@ -434,16 +443,18 @@ def run_experiment(
         "learning_rate": learning_rate,
         "optimizer": "Adam",
         "loss": "MSELoss",
-        "train_mse": train_metrics["mse"],
-        "train_mae": train_metrics["mae"],
-        "train_rmse": train_metrics["rmse"],
-        "validation_mse": validation_metrics["mse"],
-        "validation_mae": validation_metrics["mae"],
-        "validation_rmse": validation_metrics["rmse"],
-        "test_mse": test_metrics["mse"],
-        "test_mae": test_metrics["mae"],
-        "test_rmse": test_metrics["rmse"],
-        "test_mae_per_feature": test_metrics["mae_per_feature"],
+        "train_only": train_only,
+        "train_mse": None if train_only else train_metrics["mse"],
+        "train_mae": None if train_only else train_metrics["mae"],
+        "train_rmse": None if train_only else train_metrics["rmse"],
+        "validation_mse": None if train_only else validation_metrics["mse"],
+        "validation_mae": None if train_only else validation_metrics["mae"],
+        "validation_rmse": None if train_only else validation_metrics["rmse"],
+        "test_mse": None if train_only else test_metrics["mse"],
+        "test_mae": None if train_only else test_metrics["mae"],
+        "test_rmse": None if train_only else test_metrics["rmse"],
+        "test_mae_per_feature": None if train_only else test_metrics["mae_per_feature"],
+        "final_epoch_train_loss": history[-1]["train_loss"],
         "training_seconds": training_seconds,
         "parameter_count": parameter_count,
         "trained_at": trained_at,
@@ -481,6 +492,7 @@ def parse_training_args(model_type: str) -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dataset-dir", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--train-only", action="store_true", help="Benchmark training without validation or test metrics.")
     return parser.parse_args()
 
 
@@ -503,4 +515,5 @@ def run_model_cli(
         seed=args.seed,
         dataset_dir=args.dataset_dir,
         output_dir=args.output_dir,
+        train_only=args.train_only,
     )

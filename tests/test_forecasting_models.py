@@ -45,11 +45,12 @@ class ForecastModelTests(unittest.TestCase):
         horizon: int,
         input_size: int = 6,
         metadata_present: bool = True,
+        validation_samples: int = 8,
     ) -> Path:
         dataset_dir = parent / f"forecast_w{window}_h{horizon}"
         dataset_dir.mkdir()
         generator = np.random.default_rng(42)
-        counts = {"train": 12, "validation": 8, "test": 8}
+        counts = {"train": 12, "validation": validation_samples, "test": 8}
         for split, samples in counts.items():
             inputs = generator.normal(size=(samples, window, input_size)).astype(np.float32)
             targets = generator.normal(size=(samples, 6)).astype(np.float32)
@@ -75,6 +76,7 @@ class ForecastModelTests(unittest.TestCase):
             defaults = parse_training_args("linear")
         self.assertIsNone(defaults.dataset_dir)
         self.assertIsNone(defaults.output_dir)
+        self.assertFalse(defaults.train_only)
         self.assertEqual((defaults.epochs, defaults.batch_size, defaults.learning_rate, defaults.seed), (25, 32, 0.001, 42))
         self.assertEqual(default_dataset_dir().name, "forecast_w60_h60")
         self.assertEqual(default_output_dir("linear").name, "w60_h60")
@@ -85,6 +87,9 @@ class ForecastModelTests(unittest.TestCase):
         self.assertEqual(parsed.dataset_dir, Path("forecast_w60_h30"))
         self.assertEqual(parsed.output_dir, Path("linear/w60_h30_e10"))
         self.assertEqual(parsed.epochs, 10)
+
+        with patch("sys.argv", ["linear", "--train-only"]):
+            self.assertTrue(parse_training_args("linear").train_only)
 
         with tempfile.TemporaryDirectory(prefix="aquafl_cli_test_") as temp_name:
             temp_dir = Path(temp_name)
@@ -170,6 +175,44 @@ class ForecastModelTests(unittest.TestCase):
                     self.assertTrue((output_dir / "model.pt").is_file())
                     self.assertTrue((output_dir / "model.json").is_file())
                     self.assertTrue((output_dir / "metrics.json").is_file())
+
+    def test_train_only_accepts_empty_validation_without_evaluation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="aquafl_compute_test_") as temp_name:
+            temp_dir = Path(temp_name)
+            dataset_dir = self.make_dataset(temp_dir, 60, 30, validation_samples=0)
+            with self.assertRaisesRegex(ValueError, "validation.npz contains no samples"):
+                load_dataset(dataset_dir)
+
+            for model_name, (factory, _, hidden_size, num_layers) in MODEL_CASES.items():
+                with self.subTest(model=model_name):
+                    output_dir = temp_dir / "outputs" / model_name
+                    with patch("fluxos.edgebox.models.common.calculate_metrics", side_effect=AssertionError("evaluation must be skipped")):
+                        model_metadata, metrics = run_experiment(
+                            model_name,
+                            factory,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            epochs=1,
+                            batch_size=4,
+                            learning_rate=0.001,
+                            seed=42,
+                            dataset_dir=dataset_dir,
+                            output_dir=output_dir,
+                            train_only=True,
+                        )
+                    self.assertTrue(model_metadata["train_only"])
+                    self.assertTrue(metrics["train_only"])
+                    self.assertEqual(metrics["train_samples"], 12)
+                    self.assertEqual(metrics["validation_samples"], 0)
+                    self.assertEqual(metrics["test_samples"], 8)
+                    self.assertIsNone(metrics["validation_mse"])
+                    self.assertIsNone(metrics["test_mse"])
+                    self.assertIsNone(metrics["train_mse"])
+                    self.assertGreater(metrics["training_seconds"], 0)
+                    self.assertGreaterEqual(metrics["final_epoch_train_loss"], 0)
+                    self.assertNotIn("validation_mse", metrics["history"][0])
+                    self.assertTrue((output_dir / "model.pt").is_file())
+                    self.assertIsNone(json.loads((output_dir / "metrics.json").read_text())["validation_mse"])
 
     def test_datasets_and_custom_outputs_for_multiple_scenarios(self) -> None:
         with tempfile.TemporaryDirectory(prefix="aquafl_scenarios_test_") as temp_name:

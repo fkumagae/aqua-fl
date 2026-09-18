@@ -37,6 +37,24 @@ the `forecast_w<window>_h<horizon>` directory name. The output still contains
 six variables. Results for different epoch counts must use distinct output
 directories to avoid overwriting earlier runs.
 
+For a CPU-capacity benchmark when validation or test has no usable samples,
+add `--train-only`. This still requires valid `train.npz`, `validation.npz`,
+`test.npz`, and `metadata.json` files, but only the training split is used for
+computation. For example, on the TV Box:
+
+```bash
+python -m fluxos.edgebox.models.linear \
+  --dataset-dir /root/aqua-fl/dados/edgebox/processed/forecast_w60_h30 \
+  --output-dir /root/aqua-fl-final/dados/edgebox/models/linear/w60_h30_e1_compute \
+  --epochs 1 --train-only
+```
+
+The saved files are marked `train_only: true`. `training_seconds` and
+`final_epoch_train_loss` are available, while post-training accuracy metrics
+(`train_mse`, validation, and test metrics) are `null`. The per-epoch `train_loss`
+is the average loss during parameter updates, not a held-out accuracy score.
+These runs measure training capacity, not forecast quality.
+
 `requirements-benchmark.txt` is platform-neutral. On the Linux ARM64 TV Box,
 install the CPU wheel explicitly before installing the remaining requirements:
 
